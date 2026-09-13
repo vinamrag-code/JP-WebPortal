@@ -13,6 +13,7 @@ import "./styles/layout.css";
 import Header from "./components/Header";
 import Navbar from "./components/Navbar";
 import LoginScreen from "./uiv2/LoginScreen";
+import AppShell from "./uiv2/AppShell";
 import Attendance from "./components/Attendance";
 import Grades from "./components/Grades";
 import Exams from "./components/Exams";
@@ -200,29 +201,12 @@ function AuthenticatedApp({
   };
 
   return (
-    <div className="relative">
-      <Navbar
-        w={w}
-        messMenuOpen={messMenuOpen}
-        onMessMenuChange={onMessMenuChange}
-      />
-      <div
-        className="min-h-screen flex flex-col"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEndWithTransition}
-      >
-        <div className="flex-none z-30 bg-background md:ml-64">
-          <Header
-            setIsAuthenticated={setIsAuthenticated}
-            messMenuOpen={messMenuOpen}
-            onMessMenuChange={onMessMenuChange}
-            attendanceGoal={attendanceGoal}
-            setAttendanceGoal={setAttendanceGoal}
-            w={w}
-          />
-        </div>
-        <div className="flex-1 overflow-y-auto md:ml-64">
+    <div
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEndWithTransition}
+    >
+      <AppShell>
           <TransitionGroup component={null}>
             <CSSTransition
               key={location.pathname}
@@ -466,8 +450,7 @@ function AuthenticatedApp({
               </div>
             </CSSTransition>
           </TransitionGroup>
-        </div>
-      </div>
+      </AppShell>
     </div>
   );
 }
