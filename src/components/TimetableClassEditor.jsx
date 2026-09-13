@@ -42,10 +42,10 @@ const toMinutes = (hhmm) => {
  * Add/edit a single class. `initial` is a class from `schedule.classes`, or null to add a new one.
  * `existingAlias` pre-fills the "portal calls it" field when the timetable code already has a confirmed alias.
  */
-export default function TimetableClassEditor({ open, onOpenChange, initial, existingAlias, onSave, onDelete }) {
-  const [dayIndex, setDayIndex] = useState(String(initial?.dayIndex ?? 1));
-  const [start, setStart] = useState(initial ? toHHMM(initial.startMinutes) : "09:00");
-  const [end, setEnd] = useState(initial ? toHHMM(initial.startMinutes + initial.durationMinutes) : "09:50");
+export default function TimetableClassEditor({ open, onOpenChange, initial, existingAlias, onSave, onDelete, defaultDayIndex = 1, defaultStartMinutes = 540 }) {
+  const [dayIndex, setDayIndex] = useState(String(initial?.dayIndex ?? defaultDayIndex));
+  const [start, setStart] = useState(initial ? toHHMM(initial.startMinutes) : toHHMM(defaultStartMinutes));
+  const [end, setEnd] = useState(initial ? toHHMM(initial.startMinutes + initial.durationMinutes) : toHHMM(defaultStartMinutes + 50));
   const [type, setType] = useState(initial?.type ?? "L");
   const [code, setCode] = useState(initial?.code ?? "");
   const [name, setName] = useState(initial?.name ?? "");
@@ -179,4 +179,6 @@ TimetableClassEditor.propTypes = {
   existingAlias: PropTypes.string,
   onSave: PropTypes.func.isRequired,
   onDelete: PropTypes.func,
+  defaultDayIndex: PropTypes.number,
+  defaultStartMinutes: PropTypes.number,
 };

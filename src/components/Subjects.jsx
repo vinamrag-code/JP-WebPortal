@@ -54,11 +54,6 @@ export default function Subjects({
   const [moocStatusDetail, setMoocStatusDetail] = useState(null)
   const [addDropStatusDetail, setAddDropStatusDetail] = useState(null)
   const [statusLoading, setStatusLoading] = useState({ mooc: false, adddrop: false })
-  const [componentFilters, setComponentFilters] = useState({
-    L: true,
-    T: true,
-    P: true,
-  })
 
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
@@ -424,17 +419,8 @@ export default function Subjects({
   }, [currentSubjects])
 
   const filteredSubjectsList = useMemo(() => {
-    let subjects = Object.values(groupedSubjects);
-    subjects = subjects.sort((a, b) => (b.credits || 0) - (a.credits || 0));
-
-    return subjects.filter(subject => {      
-      const hasL = componentFilters.L && subject.components.some(comp => comp.type === 'L');
-      const hasT = componentFilters.T && subject.components.some(comp => comp.type === 'T');
-      const hasP = componentFilters.P && subject.components.some(comp => comp.type === 'P');
-      
-      return (hasL || hasT || hasP);
-    });
-  }, [groupedSubjects, componentFilters]);
+    return Object.values(groupedSubjects).sort((a, b) => (b.credits || 0) - (a.credits || 0));
+  }, [groupedSubjects]);
 
   const navigate = useNavigate();
 
@@ -504,26 +490,10 @@ export default function Subjects({
 
           <TabsContent value="registered" className="mt-4">
             {!subjectsLoading && currentSubjects && (
-              <div className="space-y-4 mb-6">
-                <div className="wp-card flex-row flex-wrap gap-3 items-center justify-between">
-                  <div className="wp-seg w-full md:w-auto overflow-x-auto">
-                    {[
-                      { id: 'L', label: 'Lectures' },
-                      { id: 'T', label: 'Tutorials' },
-                      { id: 'P', label: 'Practicals' }
-                    ].map((comp) => (
-                      <button
-                        key={comp.id}
-                        onClick={() => setComponentFilters(prev => ({ ...prev, [comp.id]: !prev[comp.id] }))}
-                        className={`wp-seg-opt flex-1 whitespace-nowrap ${componentFilters[comp.id] ? "active" : ""}`}
-                      >
-                        {comp.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <span className="wp-chip" style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>
-                    <i className="ph ph-book-open" style={{ fontSize: 13 }} /> Total Credits: {currentSubjects?.total_credits || 0}
+              <div className="mb-6">
+                <div className="wp-seg w-full">
+                  <span className="wp-seg-opt active flex-1" style={{ cursor: "default", textAlign: "center" }}>
+                    Total Credits: {currentSubjects?.total_credits || 0}
                   </span>
                 </div>
               </div>
@@ -545,7 +515,7 @@ export default function Subjects({
               </div>
             ) : filteredSubjectsList.length === 0 ? (
               <div className="flex items-center justify-center py-8">
-                <Empty description={Object.keys(groupedSubjects).length > 0 ? "No subjects match the selected component filters." : "No subjects found for this semester."} />
+                <Empty description="No subjects found for this semester." />
               </div>
             ) : (
               <AnimatePresence mode="popLayout">

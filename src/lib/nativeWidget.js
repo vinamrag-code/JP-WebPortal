@@ -25,9 +25,9 @@ export function buildWidgetSnapshot() {
     hasSchedule: true,
     sectionLabel: view.isToday ? (active ? "Current Class" : "Next Class") : view.label,
     hasActive: !!active,
-    active: active ? { name: active.name, time: `${active.startText} – ${active.endText}`, room: active.room } : null,
+    active: active ? { name: active.name, time: `${active.startText} – ${active.endText}`, room: active.room, type: active.type } : null,
     allDone,
-    upcoming: upcoming.map((r) => ({ name: r.name, time: r.startText })),
+    upcoming: upcoming.map((r) => ({ name: r.name, time: r.startText, type: r.type })),
   };
 }
 

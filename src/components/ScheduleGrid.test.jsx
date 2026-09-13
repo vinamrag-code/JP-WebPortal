@@ -13,12 +13,11 @@ const schedule = {
 };
 
 describe("ScheduleGrid", () => {
-  it("renders each class under its own day, and Monday is highlighted as today", () => {
+  it("renders each class in its day/time cell, with day headers for every weekday", () => {
     render(<ScheduleGrid schedule={schedule} todayDayIndex={1} onSaveClass={() => {}} onDeleteClass={() => {}} />);
     expect(screen.getByText("OS Concepts")).toBeInTheDocument();
     expect(screen.getByText("VLSI")).toBeInTheDocument();
-    expect(screen.getByText("Monday").className).toMatch(/amber/);
-    expect(screen.getByText("Tuesday").className).not.toMatch(/amber/);
+    ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].forEach((d) => expect(screen.getByText(d)).toBeInTheDocument());
   });
 
   it("clicking a class opens the editor pre-filled with that class's fields, aliased with its code alias", () => {
@@ -48,15 +47,11 @@ describe("ScheduleGrid", () => {
     expect(screen.queryByText("Edit class")).not.toBeInTheDocument();
   });
 
-  it("Add class opens an empty editor with no delete option", () => {
+  it("clicking an empty slot opens an empty editor pre-filled with that day and time, and no delete option", () => {
     render(<ScheduleGrid schedule={schedule} todayDayIndex={1} onSaveClass={() => {}} onDeleteClass={() => {}} />);
-    fireEvent.click(screen.getByTestId("add-class-button"));
+    fireEvent.click(screen.getByTestId("empty-1-480")); // Monday 08:00, no class there
     expect(screen.getByRole("heading", { name: "Add class" })).toBeInTheDocument();
     expect(screen.queryByText("Delete")).not.toBeInTheDocument();
-  });
-
-  it("a day with no classes says so", () => {
-    render(<ScheduleGrid schedule={schedule} todayDayIndex={1} onSaveClass={() => {}} onDeleteClass={() => {}} />);
-    expect(screen.getAllByText("No classes").length).toBeGreaterThan(0);
+    expect(screen.getByDisplayValue("08:00")).toBeInTheDocument();
   });
 });

@@ -75,12 +75,17 @@ public class ScheduleWidgetProvider extends AppWidgetProvider {
 
             JSONArray upcoming = data.optJSONArray("upcoming");
             int[] rowIds = { R.id.widget_up_row1, R.id.widget_up_row2 };
+            int[] dotIds = { R.id.widget_up_dot1, R.id.widget_up_dot2 };
             int[] nameIds = { R.id.widget_up_name1, R.id.widget_up_name2 };
             int[] timeIds = { R.id.widget_up_time1, R.id.widget_up_time2 };
+            if (upcoming != null && upcoming.length() > 0) {
+                views.setViewVisibility(R.id.widget_upcoming_header, View.VISIBLE);
+            }
             for (int i = 0; i < rowIds.length; i++) {
                 if (upcoming != null && i < upcoming.length()) {
                     JSONObject u = upcoming.getJSONObject(i);
                     views.setViewVisibility(rowIds[i], View.VISIBLE);
+                    views.setInt(dotIds[i], "setColorFilter", typeColor(u.optString("type", "")));
                     views.setTextViewText(nameIds[i], u.optString("name", ""));
                     views.setTextViewText(timeIds[i], u.optString("time", ""));
                 }
@@ -95,9 +100,17 @@ public class ScheduleWidgetProvider extends AppWidgetProvider {
     private static void hideAll(RemoteViews views) {
         views.setViewVisibility(R.id.widget_active_block, View.GONE);
         views.setViewVisibility(R.id.widget_alldone, View.GONE);
+        views.setViewVisibility(R.id.widget_upcoming_header, View.GONE);
         views.setViewVisibility(R.id.widget_up_row1, View.GONE);
         views.setViewVisibility(R.id.widget_up_row2, View.GONE);
         views.setViewVisibility(R.id.widget_empty, View.GONE);
+    }
+
+    private static int typeColor(String type) {
+        if ("L".equals(type)) return 0xFF60A5FA;
+        if ("T".equals(type)) return 0xFFF5A524;
+        if ("P".equals(type)) return 0xFF4ADE80;
+        return 0xFF8B8FA3;
     }
 
     private static void showEmpty(RemoteViews views, String message) {

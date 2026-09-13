@@ -13,6 +13,18 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:layout_marginBottom="8dp">
+        <FrameLayout
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:background="@drawable/widget_icon_box"
+            android:layout_marginEnd="7dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="🧭"
+                android:textSize="11sp" />
+        </FrameLayout>
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -23,6 +35,11 @@
             android:textStyle="bold"
             android:maxLines="1"
             android:ellipsize="end" />
+        <ImageView
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:src="@drawable/widget_dot"
+            android:tint="#4ADE80" />
     </LinearLayout>
 
     <TextView
@@ -37,7 +54,7 @@
         android:id="@+id/widget_alldone"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="No more classes today"
+        android:text="🌙 No more classes today"
         android:textColor="#8b8fa3"
         android:textSize="11.5sp"
         android:visibility="gone" />
@@ -51,13 +68,28 @@
         android:padding="10dp"
         android:layout_marginBottom="6dp"
         android:visibility="gone">
-        <TextView
-            android:id="@+id/widget_section_label"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#c8bfff"
-            android:textSize="9.5sp"
-            android:textStyle="bold" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="1dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="▶"
+                android:textColor="#c8bfff"
+                android:textSize="8sp"
+                android:layout_marginEnd="4dp" />
+            <TextView
+                android:id="@+id/widget_section_label"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="#c8bfff"
+                android:textSize="9.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
         <TextView
             android:id="@+id/widget_active_name"
             android:layout_width="match_parent"
@@ -77,6 +109,17 @@
             android:ellipsize="end" />
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/widget_upcoming_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="☰ UPCOMING"
+        android:textColor="#8b8fa3"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:layout_marginTop="2dp"
+        android:visibility="gone" />
+
     <LinearLayout
         android:id="@+id/widget_up_row1"
         android:layout_width="match_parent"
@@ -86,6 +129,12 @@
         android:paddingTop="3dp"
         android:paddingBottom="3dp"
         android:visibility="gone">
+        <ImageView
+            android:id="@+id/widget_up_dot1"
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:layout_marginEnd="8dp"
+            android:src="@drawable/widget_dot" />
         <TextView
             android:id="@+id/widget_up_name1"
             android:layout_width="0dp"
@@ -113,6 +162,12 @@
         android:paddingTop="3dp"
         android:paddingBottom="3dp"
         android:visibility="gone">
+        <ImageView
+            android:id="@+id/widget_up_dot2"
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:layout_marginEnd="8dp"
+            android:src="@drawable/widget_dot" />
         <TextView
             android:id="@+id/widget_up_name2"
             android:layout_width="0dp"
