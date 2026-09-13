@@ -12,7 +12,7 @@ import "./styles/transitions.css";
 import "./styles/layout.css";
 import Header from "./components/Header";
 import Navbar from "./components/Navbar";
-import Login from "./components/Login";
+import LoginScreen from "./uiv2/LoginScreen";
 import Attendance from "./components/Attendance";
 import Grades from "./components/Grades";
 import Exams from "./components/Exams";
@@ -536,7 +536,7 @@ function LoginWrapper({ onLoginSuccess, w }) {
     }, 100);
   };
 
-  return <Login onLoginSuccess={handleLoginSuccess} w={w} />;
+  return <LoginScreen onLoginSuccess={handleLoginSuccess} w={w} />;
 }
 
 function App() {
