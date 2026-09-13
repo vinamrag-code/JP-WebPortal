@@ -10,28 +10,9 @@ import {
   saveSemestersToCache,
 } from "@/components/scripts/cache";
 import { getUsername } from '@/components/scripts/cache';
-import AttendanceCard from "./AttendanceCard";
-import AttendanceDaily from "./AttendanceDaily";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Loader2,
-  ChevronDown,
-  ChevronUp,
-  ArrowUpDown,
-  BarChart3,
-  Archive,
-  CalendarDays,
-  Info,
-} from "lucide-react";
+import AttendanceSubjectCard from "@/uiv2/AttendanceSubjectCard";
+import AttendanceDailyView from "@/uiv2/AttendanceDailyView";
+import { Loader2, Archive } from "lucide-react";
 import { Helmet } from 'react-helmet-async';
 import { proxy_url } from '@/lib/api';
 import { calculateClassesNeeded, calculateClassesCanMiss } from '@/lib/math';
@@ -641,135 +622,103 @@ const Attendance = ({
       <Helmet>
         <title>Attendance - JP Portal | JIIT Student Portal</title>
       </Helmet>
-      <div className="text-foreground font-sans">
-        <div className="px-3 pt-3 max-w-[1440px] mx-auto">
-          <TodaySection w={w} attendanceGoal={attendanceGoal} />
-        </div>
-        <div className="top-14 left-0 right-0 bg-background z-10">
-          <div className="flex gap-2 py-2 px-3 max-w-[1440px] mx-auto">
-            <Select onValueChange={handleSemesterChange} value={selectedSem?.registration_id}>
-              <SelectTrigger className="bg-background text-foreground border-border">
-                <SelectValue placeholder={isAttendanceMetaLoading ? "Loading semesters..." : "Select semester"}>
-                  {selectedSem?.registration_code}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent className="bg-background text-foreground border-border">
-                {semestersData?.semesters?.map((sem) => (
-                  <SelectItem key={sem.registration_id} value={sem.registration_id} className="text-foreground hover:bg-accent">
-                    {sem.registration_code}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input
+      <div className="px-4 py-3 flex flex-col gap-3.5" style={{ color: "hsl(var(--foreground))" }}>
+        <TodaySection w={w} attendanceGoal={attendanceGoal} />
+
+        <div className="flex gap-2">
+          <select
+            className="wp-select flex-1"
+            value={selectedSem?.registration_id || ""}
+            onChange={(e) => handleSemesterChange(e.target.value)}
+          >
+            {isAttendanceMetaLoading && <option>Loading semesters…</option>}
+            {semestersData?.semesters?.map((sem) => (
+              <option key={sem.registration_id} value={sem.registration_id}>{sem.registration_code}</option>
+            ))}
+          </select>
+          <div className="wp-card flex-row items-center gap-1.5 flex-none" style={{ padding: "8px 10px" }}>
+            <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>Target</span>
+            <input
               type="number"
+              min={50}
+              max={100}
               value={attendanceGoal}
               onChange={handleGoalChange}
-              min="-1"
-              max="100"
-              className="w-32 bg-background text-foreground border-border"
-              placeholder="Goal %"
+              className="text-center font-bold text-sm"
+              style={{ width: 32, background: "transparent", border: "none", color: "hsl(var(--accent-foreground))", outline: "none" }}
             />
-            <Button
-              onClick={cycleSortOrder}
-              variant="outline"
-              className="bg-background border-border text-foreground hover:bg-accent"
-            >
-              {sortOrder === 'default' && <ArrowUpDown className="w-4 h-4 mr-1" />}
-              {sortOrder === 'asc' && <ChevronUp className="w-4 h-4 mr-1" />}
-              {sortOrder === 'desc' && <ChevronDown className="w-4 h-4 mr-1" />}
-              <span className="hidden md:inline">
-                {sortOrder === 'default' ? 'Default' : sortOrder === 'asc' ? 'Asc' : 'Desc'}
-              </span>
-            </Button>
+            <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>%</span>
           </div>
+          <button className="wp-icon-btn flex-none" style={{ border: "1px solid hsl(var(--border))" }} onClick={cycleSortOrder} aria-label="Sort">
+            {sortOrder === 'asc' ? <i className="ph ph-sort-ascending" /> : sortOrder === 'desc' ? <i className="ph ph-sort-descending" /> : <i className="ph ph-arrows-down-up" />}
+          </button>
         </div>
 
-        {!attendanceData[selectedSem?.registration_id]?.error && (
-          <div className="flex items-center justify-center py-2 text-xs text-muted-foreground">
-            <span>
-              {cacheTimestamp && isFromCache ? (
-                <span className="flex items-center gap-1">
-                  <Archive size={12} /> Cached: {getRelativeTime(cacheTimestamp)}
-                </span>
-              ) : ''}
-            </span>
-            {isRefreshing && (
-              <span className="ml-2 flex items-center gap-1">
-                <Loader2 className="animate-spin w-4 h-4" /> Refreshing...
-              </span>
-            )}
+        {!attendanceData[selectedSem?.registration_id]?.error && (cacheTimestamp && isFromCache || isRefreshing) && (
+          <div className="flex items-center justify-center gap-2 text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
+            {cacheTimestamp && isFromCache && <span className="flex items-center gap-1"><Archive size={12} /> Cached: {getRelativeTime(cacheTimestamp)}</span>}
+            {isRefreshing && <span className="flex items-center gap-1"><Loader2 className="animate-spin w-3.5 h-3.5" /> Refreshing…</span>}
           </div>
         )}
 
         {isAttendanceMetaLoading || isAttendanceDataLoading ? (
-          <div className="flex items-center justify-center py-4 h-[calc(100vh-200px)]">
-            <Loader2 className="animate-spin text-foreground w-6 h-6 mr-2" />
-            Loading attendance...
+          <div className="flex items-center justify-center py-10 gap-2" style={{ color: "hsl(var(--muted-foreground))" }}>
+            <Loader2 className="animate-spin w-5 h-5" /> Loading attendance…
           </div>
         ) : (
           <>
-            <Tabs value={activeTab} onValueChange={handleTabChange} className="px-3 pb-4 max-w-[1440px] mx-auto">
-              <TabsList className="grid grid-cols-2 bg-background relative z-30">
-                <TabsTrigger value="overview" className="bg-background data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4" /> Overview
-                </TabsTrigger>
-                <TabsTrigger value="daily" className="bg-background data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4" /> Day-to-Day
-                </TabsTrigger>
-              </TabsList>
+            <div className="wp-seg w-full">
+              <button className={`wp-seg-opt flex-1 ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => handleTabChange('overview')}>
+                <i className="ph ph-chart-bar" style={{ marginRight: 6 }} />Overview
+              </button>
+              <button className={`wp-seg-opt flex-1 ${activeTab === 'daily' ? 'active' : ''}`} onClick={() => handleTabChange('daily')}>
+                <i className="ph ph-calendar-check" style={{ marginRight: 6 }} />Day-to-Day
+              </button>
+            </div>
 
-              <TabsContent value="overview">
-                {selectedSem && attendanceData[selectedSem.registration_id]?.error ? (
-                  <div className="flex items-center justify-center py-4">
-                    {attendanceData[selectedSem.registration_id].error}
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {sortedSubjects.map((subject) => (
-                        <AttendanceCard
-                          key={subject.name}
-                          subject={subject}
-                          selectedSubject={selectedSubject}
-                          setSelectedSubject={setSelectedSubject}
-                          subjectAttendanceData={subjectAttendanceData}
-                          fetchSubjectAttendance={fetchSubjectAttendance}
-                          attendanceGoal={attendanceGoal}
-                          subjectCacheStatus={subjectCacheStatus}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </TabsContent>
-
-              <TabsContent value="daily">
-                <AttendanceDaily
-                  dailyDate={dailyDate}
-                  setDailyDate={setDailyDate}
-                  subjects={sortedSubjects}
-                  subjectAttendanceData={subjectAttendanceData}
-                />
-              </TabsContent>
-            </Tabs>
-
-            <div className="mx-3 rounded-lg bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 p-4 shadow-sm flex gap-4 items-start md:items-center animate-in slide-in-from-bottom-4 duration-700">
-              <div className="p-2 bg-amber-500/10 rounded-full flex-shrink-0">
-                <Info className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div className="flex-1 space-y-1">
-                <p className="text-sm font-bold text-amber-700 dark:text-amber-400">
-                  Daily Attendance Update
+            {activeTab === 'overview' && (
+              selectedSem && attendanceData[selectedSem.registration_id]?.error ? (
+                <p className="text-center py-4" style={{ color: "hsl(var(--muted-foreground))" }}>
+                  {attendanceData[selectedSem.registration_id].error}
                 </p>
-                <p className="text-xs md:text-sm text-amber-800/80 dark:text-amber-300/80 leading-relaxed">
+              ) : (
+                <div className="flex flex-col gap-2.5">
+                  {sortedSubjects.map((subject) => (
+                    <AttendanceSubjectCard
+                      key={subject.name}
+                      subject={subject}
+                      selectedSubject={selectedSubject}
+                      setSelectedSubject={setSelectedSubject}
+                      subjectAttendanceData={subjectAttendanceData}
+                      fetchSubjectAttendance={fetchSubjectAttendance}
+                      attendanceGoal={attendanceGoal}
+                      subjectCacheStatus={subjectCacheStatus}
+                    />
+                  ))}
+                </div>
+              )
+            )}
+
+            {activeTab === 'daily' && (
+              <AttendanceDailyView
+                dailyDate={dailyDate}
+                setDailyDate={setDailyDate}
+                subjects={sortedSubjects}
+                subjectAttendanceData={subjectAttendanceData}
+              />
+            )}
+
+            <div className="wp-card flex-row gap-3 items-start" style={{ borderLeft: "3px solid hsl(var(--chart-3))" }}>
+              <i className="ph ph-info" style={{ fontSize: 18, color: "hsl(var(--chart-3))", marginTop: 2 }} />
+              <div className="flex-1">
+                <p className="text-sm font-bold m-0" style={{ color: "hsl(var(--chart-3))" }}>Daily Attendance Update</p>
+                <p className="text-xs mt-1 mb-0 leading-relaxed" style={{ color: "hsl(var(--muted-foreground))" }}>
                   Attendance marked for today typically reflects on the portal by <strong>tomorrow morning</strong>.
                 </p>
               </div>
             </div>
           </>
         )}
-        <div className="h-16 md:h-20" />
       </div>
 
     </>
