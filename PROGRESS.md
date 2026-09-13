@@ -40,16 +40,34 @@ Local work on top of [J2V-k/jportal-vhost](https://github.com/J2V-k/jportal-vhos
 | J0 | Setup: local clone, install, baseline build, Vitest, this doc | ✅ Done |
 | J1 | **Timetable PDF parser** (pure JS, pdf.js): finds the grid, parses `L/T/P + batches + (code) - room / teacher`, filters by batch and electives | ✅ Done |
 | J1.5 | **Shared logic**: schedule data model + persistence, portal/PDF subject-code matching (incl. code aliases), "Today" view logic, widget-snapshot JSON contract | ✅ Done |
-| J2 | **Upload and review UI** on the Timetable page: upload PDF → pick batch and electives → preview (with parser warnings) → save into JPortal's timetable; richer editor (type, room, teacher) | ⏭️ Next |
-| J3 | **Today section** component on the Timetable and Attendance pages, wired to the real app (`w`, `AuthenticatedApp`) using J1.5's `today.js` | ⏳ |
-| J4 | **Mobile app** (Capacitor): Android project builds an installable APK, and portal login/attendance work inside the app; iOS project scaffolded (build needs a Mac) | ⏳ |
+| J2 | **Upload and review UI** on the Timetable page: upload PDF → pick batch and electives → preview (with parser warnings) → save into JPortal's timetable; richer editor (type, room, teacher) | ✅ Done |
+| J3 | **Today section** component on the Timetable and Attendance pages, wired to the real app (`w`) using J1.5's `today.js` | ✅ Done |
+| J4 | **Mobile app** (Capacitor): Android project builds an installable APK, and portal login/attendance work inside the app; iOS project scaffolded (build needs a Mac) | ⏭️ Next |
 | J5 | **Home-screen widgets:** widget-snapshot bridge plugin; Android widget (port from `~/jiit-widget`), built and tested here; iOS WidgetKit extension written, built on a Mac | ⏳ |
 | J6 | **Background refresh** (Android WorkManager; iOS WidgetKit timeline within its limits) with a stale indicator; secure native credential handling (Keystore / Keychain), never plaintext | ⏳ |
 
-Order note: on 13 Sep the owner asked to move the app earlier ("create the app also"), then asked to pause that and
-"keep building the web app" while they prepare UI designs to share. J1.5 (schedule/matching/today logic) was pulled
-forward from J3/J4 because none of it depends on the Capacitor wrapper, so it was ready to build immediately. The
-mobile app (J4) resumes once there's a UI to wrap, or sooner if the owner asks.
+**The web app (J0–J3) is now complete** — this is what the owner meant by "complete the whole building of the web
+app" on 13 Sep, as distinct from J4–J6 (wrapping it as a native mobile app with widgets, a separate kind of build).
+J4 resumes when the owner asks, or once there's a UI design to build the native shell around.
+
+**Awaiting the owner's UI design.** J2/J3 were built to match JPortal's *existing* shadcn/Tailwind visual language
+(the same Card/Button/Select/Dialog components and Tailwind classes the legacy Timetable/Attendance pages already
+use) rather than a new design — the owner said "let me know when you want the UI design", i.e. build now with
+sensible defaults, ask only if something needs it. Nothing here is blocked; if the owner's design differs
+meaningfully from the existing app style, expect a restyle pass over `PdfTimetableImport.jsx`, `ScheduleGrid.jsx`,
+`TimetableClassEditor.jsx`, and `TodaySection.jsx` — the logic underneath (all of `src/lib/timetable/`) shouldn't
+need to change, since it's UI-agnostic.
+
+**Not yet done for J2/J3, worth knowing:**
+- No visual/browser check was possible in this environment (no display, no screenshot tooling) — verified via
+  60 passing Vitest/RTL tests plus a production `vite build`, not by looking at the rendered page. Worth a manual
+  look once there's a way to run `npx pnpm@10 run dev` and open it (or once the owner reviews the design).
+- `PdfTimetableImport`'s "Portal calls this subject differently" alias field lives in the class editor
+  (`TimetableClassEditor.jsx`), discovered reactively when `TodaySection` can't find attendance for a class —
+  not surfaced automatically at import time as an upfront prompt. That was a deliberate simplification; revisit
+  if it turns out students don't discover the field.
+- `ScheduleGrid` doesn't show attendance percentages in the grid itself (only `TodaySection` does) — kept scope
+  narrow per the original plan ("Today" section is the attendance-linked view; the weekly grid is structural).
 
 ## Git remote (set up, push pending)
 - `origin` = `https://github.com/vinamrag-code/JP-WebPortal.git` (private, created, currently empty).
@@ -105,6 +123,70 @@ mobile app (J4) resumes once there's a UI to wrap, or sooner if the owner asks.
   - A 3-hour lab would be read as 1 hour (none on this sheet).
   - The VLSI portal code alias (`25B22EC311`) and course titles are not handled by the parser; that is handled one
     layer up, in `subjectMatching.js` (see J1.5).
+
+## J2 + J3: Upload UI, schedule editor, Today section (done)
+
+All new components live in `src/components/` (not `src/lib/timetable/`, which stays pure logic) and are wired into
+the existing pages rather than replacing them.
+
+- **`PdfTimetableImport.jsx`**: the upload wizard. Choose file → parse (pdf.js loaded on demand, see below) →
+  batch `<Select>` pre-picked by `rankBatches` with the match ratio shown per option → elective chips
+  pre-toggled by `suggestElectives`, freely togglable → parser warnings in a collapsible `Alert` → a compact
+  per-day preview → Save (`saveSchedule`, which also refreshes the legacy `timetable_modified_events` cache key
+  for free). Needs `registeredSubjects` (the portal's `get_registered_subjects_and_faculties().subjects`) passed
+  in; `Timetable.jsx` reads it from `subjectData[currentSemId]`, matching how the existing customizer does it.
+- **`pdfjsBrowser.js`**: pdf.js defaults to a relative `./pdf.worker.mjs` for its worker script, which 404s under
+  Vite. Fixed with a `?url` import so Vite emits the worker and hands back its real built URL — works in dev,
+  prod build, and inside a future Capacitor WebView. **Lazy-loaded** (`import()`) only from inside
+  `PdfTimetableImport`'s file-upload handler, not statically: pdf.js is ~380KB and only needed on one page for
+  one occasional action, so it now ships as its own chunk instead of bloating every page load. This dropped the
+  main bundle from 1.1MB to 726KB (gzip 331KB → 217KB).
+- **`TimetableClassEditor.jsx`**: shared add/edit dialog (day/type `<Select>`, `<input type="time">` start/end
+  with a live 12-hour preview, code/name/room/teachers text fields), reusing `validateClass` from `schedule.js`
+  for the same validation the logic layer already tests. Also carries the **code-alias field** — "Portal calls
+  this subject differently" — that calls `setCodeAlias` alongside the class edit, the discoverable fix for
+  cases like the VLSI PDF/portal code mismatch found in `~/jiit-widget`.
+- **`ScheduleGrid.jsx`**: the personal schedule as a 6-day grid, deliberately styled to match the legacy
+  ICS-based grid already in `Timetable.jsx` (same card shapes, badge colors per L/T/P, "today" ring highlight)
+  so the page doesn't visually fork depending on which timetable source is active. Click a class to edit it
+  (via `TimetableClassEditor`), "Add class" for a new one.
+- **`TodaySection.jsx`**: the "Today" card, mounted on **both** the Timetable and Attendance pages as the
+  original goal asked. Self-contained rather than prop-drilled: it reads the saved schedule itself
+  (`loadSchedule`), and fetches attendance itself when `w.session` exists (reusing the existing
+  `getAttendanceFromCache`/`saveAttendanceToCache` cache helpers so it doesn't duplicate a fetch the Attendance
+  page may have already done), so it works correctly regardless of which page loads first. Shows an "Import
+  timetable" prompt with no schedule, a per-class attendance percentage colored against `attendanceGoal`
+  (default 75%, matching `ScheduleBuilder.kt`'s constant from `~/jiit-widget`), and re-derives "now" every 60s
+  so a class transitioning from upcoming → live → finished, or the whole view flipping to the next class day,
+  shows up without a page reload.
+- **`Timetable.jsx`** (existing file, edited): the schedule is read via a **lazy `useState` initializer**
+  (`useState(() => loadSchedule().schedule)`), not a `useEffect`, specifically so there's no one-frame flash of
+  the legacy UI before the saved schedule is known — same synchronous-localStorage-read pattern the file already
+  uses elsewhere (e.g. `attendanceGoal` in `App.jsx`). When a schedule exists it replaces the whole page body
+  with the new header + `ScheduleGrid` (+ "Re-import PDF" / "Reset" actions); when it doesn't, **all three
+  existing flows are untouched** (Automated Parser / ICS import / manual add), with `PdfTimetableImport` offered
+  as a new card above them.
+- **`Attendance.jsx` / `App.jsx`** (existing files, edited): one `<TodaySection>` added near the top of
+  Attendance's render, and `attendanceGoal` threaded down to the `/timetable` route so both pages agree on the
+  same goal percentage.
+
+**Tests (18 new, 60 total)**: `PdfTimetableImport.test.jsx` (parse → suggest → preview → save, with `pdfTimetableParser`
+and `pdfjsBrowser` mocked via `vi.hoisted` + `importOriginal` so `schedule.js`'s real, unmocked use of
+`selectEntriesForStudent` from the same module keeps working), `ScheduleGrid.test.jsx` (per-day rendering, today
+highlight, click-to-edit pre-fill including alias, save/delete wiring, add-class, empty day), `TimetableClassEditor.test.jsx`
+(add vs. edit modes, id preservation, alias pass-through, validation-blocks-save), `TodaySection.test.jsx` (no
+schedule / no session / live fetch / failed fetch, using `vi.useFakeTimers({toFake: ["Date"]})` — faking only
+`Date` and not `setTimeout`/`setInterval`, so Testing Library's own real-timer-based `waitFor`/`findBy` polling
+isn't starved).
+
+**Mutation-checked**: breaking `schedule.js`'s day filter fails 6 tests across two files (confirms `ScheduleGrid`
+genuinely depends on the shared logic, not a copy of it); bypassing the editor's validation gate, removing the
+`belowGoal` color branch, and removing elective auto-selection each turn a specific test red.
+
+**Verified clean**: `eslint` reports zero errors on every new file (including the four new test files); the
+build (`vite build`) succeeds; the pre-existing files touched (`Timetable.jsx`, `Attendance.jsx`, `App.jsx`)
+gained no new lint errors beyond one line matching a pattern (missing PropTypes) already present on every other
+prop in that file — confirmed by comparing before/after `eslint` output line by line, not just checking exit codes.
 
 ## J1.5: Schedule model, subject matching, Today/widget-snapshot logic (done)
 
