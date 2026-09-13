@@ -43,7 +43,7 @@ Local work on top of [J2V-k/jportal-vhost](https://github.com/J2V-k/jportal-vhos
 | J2 | **Upload and review UI** on the Timetable page: upload PDF → pick batch and electives → preview (with parser warnings) → save into JPortal's timetable; richer editor (type, room, teacher) | ✅ Done |
 | J3 | **Today section** component on the Timetable and Attendance pages, wired to the real app (`w`) using J1.5's `today.js` | ✅ Done |
 | J4 | **Mobile app** (Capacitor): Android project builds an installable APK; iOS project not yet scaffolded (build needs a Mac) | ✅ Android build works; iOS not started |
-| J4b | **New UI design import & implementation** ("JP WebPortal" Nocturne-theme redesign: 7 screens + bottom nav + home-screen widget mockup, from a Claude Design canvas) — reskin the real app to match, wiring each screen to real portal data | ⏭️ Next |
+| J4b | **New UI design import & implementation** ("JP WebPortal" Nocturne-theme redesign: 7 screens + bottom nav + home-screen widget mockup, from a Claude Design canvas) — reskin the real app to match, wiring each screen to real portal data | 🚧 In progress (colors + nav done; per-screen layouts not started) |
 | J5 | **Home-screen widgets:** widget-snapshot bridge plugin; Android widget (port from `~/projects/jiit-jportal/jiit-widget`), built and tested here; iOS WidgetKit extension written, built on a Mac | ⏳ |
 | J6 | **Background refresh** (Android WorkManager; iOS WidgetKit timeline within its limits) with a stale indicator; secure native credential handling (Keystore / Keychain), never plaintext | ⏳ |
 
@@ -225,7 +225,47 @@ timetable upload, editor and Today section — runs as an installable APK, not j
 - **iOS**: not started. `npx cap add ios` needs Xcode (macOS-only); the Node/JS side (web build, Capacitor config)
   is already platform-neutral and ready for it whenever a Mac is available.
 
-## J4b: New UI design import (read, not yet implemented)
+## J4b: New UI design import — increment 1 done (colors + nav), screens not started
+
+### Increment 1: color system + Timetable nav visibility (done)
+- **`src/lib/nocturneTheme.js`**: the design's `colors()` dark/light palettes ported into JPortal's existing
+  theme-preset schema (the same `theme.styles.{light,dark}` shape as `public/theme-presets.json`'s presets), with
+  every translucent `rgba(...)` token (the design's `textMuted`/`divider`) pre-flattened to solid hex composited
+  over that mode's background — Tailwind wraps every color token as `hsl(var(--token))` and can't consume rgba.
+- **Bundled, not fetched**: `theme.js`'s existing preset system fetches its CDN list from
+  `cdn.jsdelivr.net/gh/J2V-k/jportal-vhost@main/public/theme-presets.json` — **upstream's own repo/branch**, not
+  ours — so editing our local `public/theme-presets.json` would never actually reach the running app. Nocturne is
+  instead merged into `getAllThemePresets()`/`getPresetsByCategory()` in code, so it's selectable and (unlike the
+  CDN ones) works fully offline and on first run before any fetch completes.
+- **New-install default**: `ThemeContext.jsx`'s `initializeTheme()` now applies Nocturne instead of the old ad-hoc
+  "Vercel Dark" object when nothing is saved yet. Anyone who already picked a theme keeps it — this only changes
+  what a fresh install boots with.
+- **Free reskin of J1-J3**: because `TodaySection`/`ScheduleGrid`/`PdfTimetableImport`/`TimetableClassEditor` were
+  built on the existing shadcn `Card`/`Badge`/`Button`/`Dialog` components (which read these same CSS variables)
+  rather than hardcoded colors, they now render in Nocturne's palette automatically — no component changes needed.
+- **Timetable tab always shown**: `getShowTimetableInNavbar()` (`cache.js`) now defaults to `true` for anyone who
+  has never touched the setting (it was `false`), since Timetable does real work now. An explicit prior choice
+  (on or off) is still respected exactly.
+- **Deliberately not changed**: the design's buttons are outline/ghost style (transparent fill, accent
+  border+text — see `styles.css`'s `.btn-primary`); JPortal's shared `Button` component defaults to solid-fill.
+  Matching that exactly means restyling a component used by every button in the whole app, which needed visual
+  verification I can't do here (no display on this dev machine) — left as an explicit follow-up, not attempted
+  blind. Same reasoning for keeping `lucide-react` icons rather than switching to the design's Phosphor icons.
+- **Tests (7 new)**: `nocturneTheme.test.js` — every color value is solid hex not rgba, dark/light have matching
+  keys, `applyTheme()` actually sets the right DOM class and CSS variables (asserted structurally — an HSL-triplet
+  shape and dark-vs-light lightness relationship — rather than a hand-computed exact HSL string, since
+  `hexToHsl`'s rounding isn't reimplemented in the test), and the preset is found by `getAllThemePresets`/
+  `getPresetById`/`getPresetsByCategory` even when `fetch` is stubbed to reject (offline-safe). Plus
+  `cache.showTimetable.test.js` (2 tests) for the new default. Mutation-checked. 67/67 tests pass, `vite build`
+  succeeds, and a rebuilt Android APK (`jportal-v1.1-debug.apk`) was scanned clean and sent to the owner.
+- **Not verified visually**: no display on this dev machine — checked via `applyTheme`'s actual DOM/CSS-variable
+  output in tests and by grepping the built JS bundle for the accent color, not by looking at a rendered screen.
+  The owner's phone is the real check.
+
+### Increment 2+ (not started): per-screen layouts
+The design's actual page layouts (ring-chart Attendance cards, day/week Timetable views, the Exams list with seat
+numbers, Grades charts, Subjects component badges, Profile) have not been touched — only the color system and one
+nav-visibility default changed so far. Read on for what those screens contain and how they relate to J1-J3.
 
 On 13 Sep the owner shared a Claude Design canvas — `claude.ai/design/p/c9761a04-842d-42d7-bc94-6c272e0ca578`,
 project "# JIIT Campus App Design", file `JP WebPortal.dc.html` — and asked to implement it and ship an APK.
