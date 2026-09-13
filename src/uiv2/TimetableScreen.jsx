@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { classesOn, removeClass, setCodeAlias, upsertClass } from "@/lib/timetable/schedule";
 import { formatMinutes } from "@/lib/timetable/today";
 import { loadSchedule, saveSchedule, clearSchedule } from "@/lib/timetable/timetableStore";
-import { showErrorToast, showSuccessToast } from "@/lib/toastUtils";
+import { attendanceCodeFor, subjectNamesByCode } from "@/lib/timetable/subjectMatching";
+import { showErrorToast, showSuccessToast, showWarningToast } from "@/lib/toastUtils";
 import PdfTimetableImport from "@/components/PdfTimetableImport";
 import ScheduleGrid from "@/components/ScheduleGrid";
+import { requestPinHomeScreenWidget, syncWidgetData } from "@/lib/nativeWidget";
 
 const DAYS = [
   { index: 1, short: "Mon", full: "Monday" },
@@ -32,9 +34,17 @@ function todayDayIndex() {
  */
 export default function TimetableScreen({ registeredSubjects = [] }) {
   const [schedule, setSchedule] = useState(() => loadSchedule().schedule);
-  const [view, setView] = useState("day");
   const [selectedDay, setSelectedDay] = useState(todayDayIndex());
   const [mode, setMode] = useState("view"); // 'view' | 'edit' | 'import'
+
+  const namesByCode = useMemo(() => subjectNamesByCode(registeredSubjects), [registeredSubjects]);
+  // `c.name` was baked in at PDF-import time and falls back to the bare code when registeredSubjects was
+  // empty then - prefer a live match from currently-loaded registeredSubjects over that stale fallback.
+  const nameFor = (c) => namesByCode.get(attendanceCodeFor(c.code, schedule?.codeAliases)) || (c.name && c.name !== c.code ? c.name : c.code);
+
+  useEffect(() => {
+    syncWidgetData();
+  }, [schedule]);
 
   const handleSaveClass = (original, updated, portalAlias) => {
     try {
@@ -56,6 +66,14 @@ export default function TimetableScreen({ registeredSubjects = [] }) {
       showSuccessToast("Timetable", "Class removed.");
     } catch (err) {
       showErrorToast("Timetable", err?.message || "Could not delete this class.");
+    }
+  };
+
+  const handleAddWidget = async () => {
+    try {
+      await requestPinHomeScreenWidget();
+    } catch (err) {
+      showWarningToast("Add Widget", err?.message || "Could not add the widget.");
     }
   };
 
@@ -117,90 +135,64 @@ export default function TimetableScreen({ registeredSubjects = [] }) {
         <button
           className="wp-btn"
           style={{ minHeight: 38, fontSize: 12, borderColor: "hsl(var(--border))", color: "hsl(var(--foreground))" }}
+          onClick={handleAddWidget}
+        >
+          <i className="ph ph-plus-circle" style={{ fontSize: 14 }} /><span>Add Widget</span>
+        </button>
+        <button
+          className="wp-btn"
+          style={{ minHeight: 38, fontSize: 12, borderColor: "hsl(var(--border))", color: "hsl(var(--foreground))" }}
           onClick={() => setMode("import")}
         >
-          <i className="ph ph-upload-simple" style={{ fontSize: 14 }} /><span>Re-import</span>
+          <i className="ph ph-upload-simple" style={{ fontSize: 14 }} /><span>Upload</span>
         </button>
       </div>
 
-      <div className="wp-seg w-full">
-        <button className={`wp-seg-opt flex-1 ${view === "day" ? "active" : ""}`} onClick={() => setView("day")}>Day</button>
-        <button className={`wp-seg-opt flex-1 ${view === "week" ? "active" : ""}`} onClick={() => setView("week")}>Week</button>
+      <div className="wp-hscroll flex gap-1.5 overflow-x-auto pb-0.5">
+        {DAYS.map((d) => (
+          <button
+            key={d.index}
+            onClick={() => setSelectedDay(d.index)}
+            className="wp-seg-opt flex-none"
+            style={{
+              borderRadius: 20,
+              border: "1px solid hsl(var(--border))",
+              background: selectedDay === d.index ? "hsl(var(--accent))" : "transparent",
+              color: selectedDay === d.index ? "hsl(var(--accent-foreground))" : "hsl(var(--muted-foreground))",
+            }}
+          >
+            {d.short}
+          </button>
+        ))}
       </div>
-
-      {view === "day" ? (
-        <>
-          <div className="wp-hscroll flex gap-1.5 overflow-x-auto pb-0.5">
-            {DAYS.map((d) => (
-              <button
-                key={d.index}
-                onClick={() => setSelectedDay(d.index)}
-                className="wp-seg-opt flex-none"
-                style={{
-                  borderRadius: 20,
-                  border: "1px solid hsl(var(--border))",
-                  background: selectedDay === d.index ? "hsl(var(--accent))" : "transparent",
-                  color: selectedDay === d.index ? "hsl(var(--accent-foreground))" : "hsl(var(--muted-foreground))",
-                }}
-              >
-                {d.short}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-col gap-2">
-            {dayClasses.length === 0 && (
-              <p className="text-sm text-center py-6" style={{ color: "hsl(var(--muted-foreground))" }}>No classes.</p>
-            )}
-            {dayClasses.map((c) => (
-              <div key={c.id} className="wp-card flex-row items-center gap-3">
-                <div className="flex-none rounded-full" style={{ width: 2, alignSelf: "stretch", background: TYPE_COLOR[c.type] }} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[14.5px] font-medium truncate">{c.name ?? c.code}</div>
-                  <div className="text-[11.5px]" style={{ color: "hsl(var(--muted-foreground))" }}>
-                    {formatMinutes(c.startMinutes)} – {formatMinutes(c.startMinutes + c.durationMinutes)}
-                  </div>
-                  <div className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
-                    {c.room}{c.teachers?.length ? ` · ${c.teachers.join("/")}` : ""}
-                  </div>
-                </div>
-                <span
-                  className="wp-chip flex-none"
-                  style={{ background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))" }}
-                >
-                  {TYPE_LABEL[c.type]}
-                </span>
+      <div className="flex flex-col gap-2">
+        {dayClasses.length === 0 && (
+          <p className="text-sm text-center py-6" style={{ color: "hsl(var(--muted-foreground))" }}>No classes.</p>
+        )}
+        {dayClasses.map((c) => (
+          <div key={c.id} className="wp-card flex-row items-center gap-3">
+            <div className="flex-none rounded-full" style={{ width: 2, alignSelf: "stretch", background: TYPE_COLOR[c.type] }} />
+            <div className="flex-1 min-w-0">
+              <div className="text-[14.5px] font-medium truncate">{nameFor(c)}</div>
+              {nameFor(c) !== c.code && (
+                <div className="text-[10.5px] font-mono" style={{ color: "hsl(var(--muted-foreground))" }}>{c.code}</div>
+              )}
+              <div className="text-[11.5px]" style={{ color: "hsl(var(--muted-foreground))" }}>
+                {formatMinutes(c.startMinutes)} – {formatMinutes(c.startMinutes + c.durationMinutes)}
               </div>
-            ))}
-          </div>
-        </>
-      ) : (
-        <div className="wp-hscroll overflow-x-auto">
-          <div className="flex gap-1" style={{ minWidth: 600 }}>
-            {DAYS.map((d) => (
-              <div key={d.index} className="flex-1 flex flex-col gap-1" style={{ minWidth: 88 }}>
-                <button
-                  onClick={() => { setSelectedDay(d.index); setView("day"); }}
-                  className="rounded-md text-center py-1.5 border-none"
-                  style={{ background: d.index === selectedDay ? "hsl(var(--accent))" : "transparent", color: "hsl(var(--foreground))", cursor: "pointer" }}
-                >
-                  <div className="text-[11px] font-bold">{d.short}</div>
-                </button>
-                {classesOn(schedule, d.index).sort((a, b) => a.startMinutes - b.startMinutes).map((c) => (
-                  <div
-                    key={c.id}
-                    className="rounded-md px-1.5 py-1"
-                    style={{ background: "hsl(var(--card))", borderLeft: `2px solid ${TYPE_COLOR[c.type]}` }}
-                  >
-                    <div className="text-[10px]" style={{ color: "hsl(var(--muted-foreground))" }}>{formatMinutes(c.startMinutes)}</div>
-                    <div className="text-[11.5px] font-semibold truncate">{c.code}</div>
-                    <div className="text-[10px] truncate" style={{ color: "hsl(var(--muted-foreground))" }}>{c.room}</div>
-                  </div>
-                ))}
+              <div className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
+                {c.room}{c.teachers?.length ? ` · ${c.teachers.join("/")}` : ""}
               </div>
-            ))}
+            </div>
+            <span
+              className="wp-chip flex-none"
+              style={{ background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))" }}
+            >
+              {TYPE_LABEL[c.type]}
+            </span>
           </div>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 }

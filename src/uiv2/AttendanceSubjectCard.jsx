@@ -99,6 +99,13 @@ export default function AttendanceSubjectCard({
                 .join(" · ") || `${pct}%`}
             </div>
           </div>
+          <div
+            className="flex-none text-center rounded-lg"
+            style={{ background: "color-mix(in srgb, hsl(var(--foreground)) 6%, transparent)", padding: "6px 10px", minWidth: 56 }}
+          >
+            <div className="text-base font-bold" style={{ color: "hsl(var(--foreground))" }}>{attn.attended}</div>
+            <div className="text-[10px] whitespace-nowrap" style={{ color: "hsl(var(--muted-foreground))" }}>of {attn.total}</div>
+          </div>
           <div className="flex flex-col items-center gap-1 flex-none">
             <div className="relative" style={{ width: 46, height: 46 }}>
               {isFetching ? (

@@ -16,7 +16,6 @@ import { Loader2, Archive } from "lucide-react";
 import { Helmet } from 'react-helmet-async';
 import { proxy_url } from '@/lib/api';
 import { calculateClassesNeeded, calculateClassesCanMiss } from '@/lib/math';
-import TodaySection from './TodaySection';
 
 const CACHE_DURATION = 4 * 60 * 60 * 1000;
 
@@ -623,8 +622,6 @@ const Attendance = ({
         <title>Attendance - JP Portal | JIIT Student Portal</title>
       </Helmet>
       <div className="px-4 py-3 flex flex-col gap-3.5" style={{ color: "hsl(var(--foreground))" }}>
-        <TodaySection w={w} attendanceGoal={attendanceGoal} />
-
         <div className="flex gap-2">
           <select
             className="wp-select flex-1"
