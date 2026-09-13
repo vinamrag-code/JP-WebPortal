@@ -366,7 +366,11 @@ export const setDefaultTheme = (t) => { try { localStorage.setItem('defaultTheme
 export const getSelectedPreset = () => { try { return localStorage.getItem('selectedPreset') || ''; } catch (e) { return ''; } };
 export const setSelectedPreset = (id) => { try { localStorage.setItem('selectedPreset', id); } catch (e) { } };
 
-export const getShowTimetableInNavbar = () => { try { return localStorage.getItem('showTimetableInNavbar') === 'true'; } catch (e) { return false; } };
+// Defaults to on (shown) for anyone who has never touched the setting, now that Timetable does real work
+// (PDF import, a real schedule, a Today section) rather than only the old ICS-import flow. Anyone who has
+// explicitly toggled it before (the stored value is 'true' or 'false', never absent after that) keeps their
+// own choice.
+export const getShowTimetableInNavbar = () => { try { const v = localStorage.getItem('showTimetableInNavbar'); return v === null ? true : v === 'true'; } catch (e) { return true; } };
 export const setShowTimetableInNavbar = (v) => { try { localStorage.setItem('showTimetableInNavbar', v ? 'true' : 'false'); } catch (e) { } };
 
 export const getProfileDataRaw = () => { try { const raw = localStorage.getItem('profileData') || localStorage.getItem('pd') || '{}'; return JSON.parse(raw); } catch (e) { return {}; } };

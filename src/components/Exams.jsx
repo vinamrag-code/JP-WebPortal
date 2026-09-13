@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Calendar, Clock, MapPin, Armchair, Timer } from "lucide-react";
 import { ArtificialWebPortal } from "./scripts/artificialW";
 import { setExamDates } from '@/components/scripts/cache';
 import {
@@ -13,13 +12,6 @@ import {
   getExamScheduleFromCache,
   getUsername
 } from '@/components/scripts/cache';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Helmet } from 'react-helmet-async';
 import { showErrorToast } from '@/lib/toastUtils';
 
@@ -332,16 +324,6 @@ export default function Exams({
   const currentSchedule =
     selectedExamEvent && examSchedule[selectedExamEvent.exam_event_id];
 
-  const formatDate = (dateStr) => {
-    const [day, month, year] = dateStr.split("/");
-    return new Date(`${month}/${day}/${year}`).toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
   return (
     <>
       <Helmet>
@@ -350,76 +332,45 @@ export default function Exams({
         <meta name="keywords" content="JIIT exams, exam schedule, JP Portal" />
         <link rel="canonical" href="https://jportal2-0.vercel.app/#/exams" />
       </Helmet>
-      <div className="container mx-auto p-4 space-y-8 max-w-[1440px] pb-24">
-        <div className="bg-card shadow-xl rounded-2xl p-8 border border-border">
-          <div className="flex flex-col lg:flex-row lg:space-x-6 space-y-4 lg:space-y-0">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-foreground mb-2">
-                Select Semester
-              </label>
-              <Select
-                onValueChange={handleSemesterChange}
-                value={selectedExamSem?.registration_id || ""}
-              >
-                <SelectTrigger className="w-full h-12 bg-background border-2 border-border hover:border-primary/50 transition-colors">
-                  <SelectValue placeholder="Choose your semester" />
-                </SelectTrigger>
-                <SelectContent>
-                  {examSemesters.map((sem) => (
-                    <SelectItem
-                      key={sem.registration_id}
-                      value={sem.registration_id}
-                      className="cursor-pointer"
-                    >
-                      {sem.registration_code}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      <div className="px-4 py-3 flex flex-col gap-4">
+        <div className="wp-card gap-3.5">
+          <div>
+            <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>Select Semester</label>
+            <div className="relative">
+              <select className="wp-select" value={selectedExamSem?.registration_id || ""} onChange={(e) => handleSemesterChange(e.target.value)}>
+                <option value="" disabled>Choose your semester</option>
+                {examSemesters.map((sem) => (
+                  <option key={sem.registration_id} value={sem.registration_id}>{sem.registration_code}</option>
+                ))}
+              </select>
+              <i className="ph ph-caret-down" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "hsl(var(--muted-foreground))", pointerEvents: "none" }} />
             </div>
-            {selectedExamSem && (
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Select Exam Event
-                </label>
-                <Select
-                  onValueChange={handleEventChange}
-                  value={selectedExamEvent?.exam_event_id || ""}
-                >
-                  <SelectTrigger className="w-full h-12 bg-background border-2 border-border hover:border-primary/50 transition-colors">
-                    <SelectValue placeholder="Choose exam event" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {examEvents.map((event) => (
-                      <SelectItem
-                        key={event.exam_event_id}
-                        value={event.exam_event_id}
-                        className="cursor-pointer"
-                      >
-                        {event.exam_event_desc}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
           </div>
+          {selectedExamSem && (
+            <div>
+              <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>Select Exam Event</label>
+              <div className="relative">
+                <select className="wp-select" value={selectedExamEvent?.exam_event_id || ""} onChange={(e) => handleEventChange(e.target.value)}>
+                  <option value="" disabled>Choose exam event</option>
+                  {examEvents.map((event) => (
+                    <option key={event.exam_event_id} value={event.exam_event_id}>{event.exam_event_desc}</option>
+                  ))}
+                </select>
+                <i className="ph ph-caret-down" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "hsl(var(--muted-foreground))", pointerEvents: "none" }} />
+              </div>
+            </div>
+          )}
         </div>
 
         {loading ? (
           <LoadingSkeleton />
         ) : currentSchedule?.length > 0 ? (
-          <ExamScheduleGrid
-            currentSchedule={currentSchedule}
-            formatDate={formatDate}
-          />
+          <ExamScheduleGrid currentSchedule={currentSchedule} />
         ) : selectedExamEvent ? (
-          <div className="bg-card border border-border rounded-2xl p-12 flex flex-col items-center justify-center text-center shadow-lg">
-            <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mb-4">
-              <Calendar className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-xl font-semibold text-foreground mb-2">No Exam Schedule Available</h3>
-            <p className="text-muted-foreground max-w-md">
+          <div className="wp-card items-center text-center gap-2.5" style={{ padding: "32px 20px" }}>
+            <i className="ph ph-calendar-x" style={{ fontSize: 36, color: "hsl(var(--muted-foreground))" }} />
+            <div className="text-base font-semibold">No Exam Schedule Available</div>
+            <p className="text-[12.5px] leading-relaxed m-0" style={{ color: "hsl(var(--muted-foreground))" }}>
               There are no exams scheduled for the selected exam event. Please check back later or select a different exam event.
             </p>
           </div>
@@ -429,7 +380,7 @@ export default function Exams({
   );
 }
 
-function ExamScheduleGrid({ currentSchedule, formatDate }) {
+function ExamScheduleGrid({ currentSchedule }) {
   const now = new Date();
 
   const parseExamDateTime = (dateStr, timeStr) => {
@@ -460,209 +411,69 @@ function ExamScheduleGrid({ currentSchedule, formatDate }) {
     return dateA - dateB;
   });
 
+  // The design highlights the single soonest upcoming exam with a "SOON" badge, rather than a countdown on
+  // every card (ExamCard/useCountdown's per-second timer is still available if a future pass wants it back).
+  const nearest = sortedSchedule.find((exam) => parseExamDateTime(exam.datetime, exam.datetimefrom || "00:00") > now);
+
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {sortedSchedule.map((exam) => (
-          <ExamCard
-            key={`${exam.subjectcode}-${exam.datetime}-${exam.datetimefrom}`}
-            exam={exam}
-            formatDate={formatDate}
-          />
-        ))}
-      </div>
+    <div className="flex flex-col gap-2">
+      {sortedSchedule.map((exam) => (
+        <ExamCard
+          key={`${exam.subjectcode}-${exam.datetime}-${exam.datetimefrom}`}
+          exam={exam}
+          isNearest={exam === nearest}
+        />
+      ))}
     </div>
   );
 }
 
-function useCountdown(targetDate) {
-  const [timeLeft, setTimeLeft] = useState(null);
-  const [isWithin4Hours, setIsWithin4Hours] = useState(false);
-
-  useEffect(() => {
-    const updateCountdown = () => {
-      const now = new Date().getTime();
-      const target = new Date(targetDate).getTime();
-      const difference = target - now;
-      const fourHours = 4 * 60 * 60 * 1000;
-      const within4Hours = difference > 0 && difference <= fourHours;
-      setIsWithin4Hours(within4Hours);
-
-      if (difference > 0 && within4Hours) {
-        const hours = Math.floor(difference / (1000 * 60 * 60));
-        const minutes = Math.floor(
-          (difference % (1000 * 60 * 60)) / (1000 * 60)
-        );
-        const seconds = Math.floor((difference % (1000 * 60)) / 1000);
-
-        setTimeLeft({ hours, minutes, seconds });
-      } else {
-        setTimeLeft(null);
-      }
-    };
-
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
-
-    return () => clearInterval(interval);
-  }, [targetDate]);
-
-  return { timeLeft, isWithin4Hours };
-}
-
-function ExamCard({ exam, formatDate, index }) {
-  const parseExamDateTime = (dateStr, timeStr) => {
-    const [day, month, year] = dateStr.split("/");
-    const [time, period] = timeStr.split(" ");
-    const [hours, minutes] = time.split(":");
-
-    let hour24 = parseInt(hours);
-    if (period?.toUpperCase() === "PM" && hour24 !== 12) {
-      hour24 += 12;
-    } else if (period?.toUpperCase() === "AM" && hour24 === 12) {
-      hour24 = 0;
-    }
-
-    return new Date(
-      parseInt(year),
-      parseInt(month) - 1,
-      parseInt(day),
-      hour24,
-      parseInt(minutes)
-    );
-  };
-
-  const examDateTime = parseExamDateTime(
-    exam.datetime,
-    exam.datetimefrom || "00:00"
-  );
-  const now = new Date();
-  const timeDiff = examDateTime.getTime() - now.getTime();
-  const isUpcoming = timeDiff > 0;
-  const isStartingSoon = timeDiff > 0 && timeDiff <= 4 * 60 * 60 * 1000;
-  const isOngoing = timeDiff <= 0 && timeDiff > -2 * 60 * 60 * 1000; // Assume 2 hours duration
-  const isCompleted = timeDiff <= -2 * 60 * 60 * 1000;
-
-  const { timeLeft } = useCountdown(examDateTime);
-
-  const statusClasses = isCompleted
-    ? "bg-muted/70 text-muted-foreground"
-    : isOngoing
-    ? "bg-primary/10 text-primary"
-    : isStartingSoon
-    ? "bg-accent/10 text-accent-foreground"
-    : "bg-secondary/10 text-secondary-foreground";
+/**
+ * One exam row, matching the design: a day/month block, subject name/code, and room/seat with a "SOON"
+ * badge on the single soonest upcoming exam (see ExamScheduleGrid). Kept as a list row rather than the
+ * previous 2-column card grid.
+ */
+function ExamCard({ exam, isNearest }) {
+  const [day, month] = exam.datetime.split("/");
+  const monthName = new Date(2000, Number(month) - 1, 1).toLocaleDateString("en-US", { month: "short" });
 
   return (
-    <div className="relative bg-card text-card-foreground shadow-lg rounded-xl p-6 transition-all duration-300 hover:shadow-xl hover:scale-[1.02] border border-border">
-
-      {/* Countdown Timer for upcoming exams */}
-      {isUpcoming && timeLeft && (
-        <div className="mb-4 p-3 bg-muted/20 rounded-lg border border-border">
-          <div className="flex items-center justify-center gap-2 text-primary">
-            <Timer className="w-4 h-4" />
-            <span className="font-semibold text-sm text-foreground">
-              Starts in: {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Subject Info */}
-      <div className="mb-4">
-        <div className="flex items-start justify-between mb-2">
-          <h3 className="font-bold text-xl text-foreground leading-tight">
-            {exam.subjectdesc.split("(")[0].trim()}
-          </h3>
-        </div>
-        <p className="text-sm font-medium text-foreground bg-muted/20 px-2 py-1 rounded-md inline-block">
-          {exam.subjectcode}
-        </p>
+    <div className="wp-card flex-row items-center gap-3">
+      <div className="flex-none text-center" style={{ width: 44 }}>
+        <div className="text-[17px] font-bold leading-none">{day}</div>
+        <div className="text-[10px] mt-0.5" style={{ color: "hsl(var(--muted-foreground))" }}>{monthName}</div>
       </div>
-
-      {/* Exam Details Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Date & Time */}
-        <div className="space-y-3">
-          <div className="flex items-center p-3 bg-muted/20 rounded-lg border border-border">
-            <Calendar className="mr-3 h-5 w-5 text-primary flex-shrink-0" />
-            <div>
-              <div className="font-medium text-foreground">{formatDate(exam.datetime)}</div>
-              <div className="text-sm text-muted-foreground">Exam Date</div>
-            </div>
-          </div>
-          <div className="flex items-center p-3 bg-muted/20 rounded-lg border border-border">
-            <Clock className="mr-3 h-5 w-5 text-primary flex-shrink-0" />
-            <div>
-              <div className="font-medium text-foreground">{exam.datetimeupto}</div>
-              <div className="text-sm text-muted-foreground">Duration</div>
-            </div>
-          </div>
+      <div className="flex-none rounded-full" style={{ width: 2, alignSelf: "stretch", background: "hsl(var(--border))" }} />
+      <div className="flex-1 min-w-0">
+        <div className="text-[14.5px] font-medium truncate">{exam.subjectdesc.split("(")[0].trim()}</div>
+        <div className="text-xs truncate" style={{ color: "hsl(var(--muted-foreground))" }}>
+          {exam.subjectcode} · {exam.datetimefrom}{exam.datetimeupto ? `–${exam.datetimeupto}` : ""}
         </div>
-
-        {/* Room & Seat */}
-        {(exam.roomcode || exam.seatno) && (
-          <div className="space-y-3">
-            {exam.roomcode && (
-              <div className="flex items-center p-3 bg-muted/20 rounded-lg border border-border">
-                <MapPin className="mr-3 h-5 w-5 text-foreground flex-shrink-0" />
-                <div>
-                  <div className="font-semibold text-foreground">{exam.roomcode}</div>
-                  <div className="text-sm text-muted-foreground">Room</div>
-                </div>
-              </div>
-            )}
-            {exam.seatno && (
-              <div className="flex items-center p-3 bg-muted/20 rounded-lg border border-border">
-                <Armchair className="mr-3 h-5 w-5 text-foreground flex-shrink-0" />
-                <div>
-                  <div className="font-semibold text-foreground">{exam.seatno}</div>
-                  <div className="text-sm text-muted-foreground">Seat</div>
-                </div>
-              </div>
-            )}
-          </div>
+      </div>
+      <div className="flex-none text-right flex flex-col items-end gap-0.5" style={{ minWidth: 64 }}>
+        {isNearest && (
+          <span className="wp-chip" style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))", whiteSpace: "nowrap" }}>SOON</span>
         )}
+        {exam.roomcode && <div className="text-[12.5px] font-bold whitespace-nowrap">{exam.roomcode}</div>}
+        {exam.seatno && <div className="text-[10.5px] whitespace-nowrap" style={{ color: "hsl(var(--muted-foreground))" }}>Seat {exam.seatno}</div>}
       </div>
-
     </div>
   );
 }
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-6">
-      {/* Exam Cards Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-card shadow-lg rounded-xl p-6 border border-border animate-pulse">
-            <div className="flex justify-between items-start mb-4">
-              <div className="h-6 w-6 bg-muted/20 rounded-full"></div>
-              <div className="h-5 w-20 bg-muted/20 rounded-full"></div>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <div className="h-6 w-3/4 bg-muted/20 rounded mb-2"></div>
-                <div className="h-4 w-1/2 bg-muted/20 rounded"></div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <div className="h-12 bg-muted/20 rounded-lg"></div>
-                  <div className="h-12 bg-muted/20 rounded-lg"></div>
-                </div>
-                <div className="space-y-3">
-                  <div className="h-12 bg-muted/20 rounded-lg"></div>
-                  <div className="h-12 bg-muted/20 rounded-lg"></div>
-                </div>
-              </div>
-              <div className="pt-4 border-t border-border">
-                <div className="h-4 w-24 bg-muted/20 rounded mb-2"></div>
-                <div className="h-2 bg-muted/20 rounded-full"></div>
-              </div>
-            </div>
+    <div className="flex flex-col gap-2">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="wp-card flex-row items-center gap-3 animate-pulse">
+          <div className="rounded" style={{ width: 44, height: 34, background: "hsl(var(--muted))" }} />
+          <div className="flex-1 flex flex-col gap-1.5">
+            <div className="rounded" style={{ height: 14, width: "70%", background: "hsl(var(--muted))" }} />
+            <div className="rounded" style={{ height: 10, width: "45%", background: "hsl(var(--muted))" }} />
           </div>
-        ))}
-      </div>
+          <div className="rounded" style={{ height: 14, width: 40, background: "hsl(var(--muted))" }} />
+        </div>
+      ))}
     </div>
   );
 }

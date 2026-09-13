@@ -68,6 +68,145 @@
     font-family: var(--font-family);
   }
 }
+
+/**
+ * Nocturne UI (src/uiv2/) component classes, ported verbatim from the owner's Claude Design canvas
+ * ("JP WebPortal.dc.html")'s own inline <style> block. Colors reference the app's real CSS custom
+ * properties (--background, --primary, etc. — see src/lib/nocturneTheme.js) rather than the canvas's own
+ * --bg/--accent names, so these track whichever theme preset and light/dark mode is active.
+ *
+ * Declared here (not a separately-imported stylesheet) and inside @layer components: Tailwind v3's @layer
+ * directive is only resolved within the CSS file holding the matching @tailwind components declaration
+ * above — using it in a separately-imported CSS module errors ("Tailwind CSS ... @layer" build failure). It
+ * has to be @layer components (not left unlayered) so a Tailwind utility like `pl-9` on the same element
+ * still overrides it — CSS cascade layers give ANY layered rule priority over unlayered CSS regardless of
+ * specificity, so unlayered custom classes would otherwise beat Tailwind's own utilities unconditionally,
+ * which is what caused the login screen's icon/placeholder-text overlap during visual QA.
+ */
+@layer components {
+  .wp-input {
+    width: 100%;
+    min-height: 44px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    padding-left: 12px;
+    padding-right: 12px;
+    font: inherit;
+    font-size: 15px;
+    color: hsl(var(--foreground));
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+    box-sizing: border-box;
+  }
+  .wp-input::placeholder { color: hsl(var(--muted-foreground)); }
+  .wp-input:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 0; border-color: hsl(var(--primary)); }
+
+  .wp-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 48px;
+    border-radius: 10px;
+    font-family: "Inter", sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    border: 1.5px solid hsl(var(--primary));
+    background: transparent;
+    color: hsl(var(--accent-foreground));
+  }
+  .wp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .wp-icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: hsl(var(--foreground));
+  }
+  .wp-icon-btn:active { background: hsl(var(--muted)); }
+
+  .wp-seg {
+    display: inline-flex;
+    border: 1px solid hsl(var(--border));
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .wp-seg-opt {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    color: hsl(var(--muted-foreground));
+    background: transparent;
+    border: none;
+  }
+  .wp-seg-opt.active { color: hsl(var(--accent-foreground)); background: hsl(var(--accent)); }
+
+  .wp-navitem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    flex: 1;
+    padding: 6px 0 4px;
+    cursor: pointer;
+    background: none;
+    border: none;
+  }
+  .wp-navitem .lbl { font-size: 11px; font-weight: 600; }
+
+  .wp-card {
+    display: flex;
+    flex-direction: column;
+    background: hsl(var(--card));
+    border-radius: 12px;
+    padding: 14px;
+    color: inherit;
+  }
+
+  .wp-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+  }
+
+  .wp-select {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    min-height: 44px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    padding-left: 12px;
+    padding-right: 34px;
+    font: inherit;
+    font-size: 14px;
+    color: hsl(var(--foreground));
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    border-radius: 8px;
+    box-sizing: border-box;
+  }
+  .wp-select:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 0; border-color: hsl(var(--primary)); }
+
+  .wp-hscroll { scrollbar-width: none; -ms-overflow-style: none; }
+  .wp-hscroll::-webkit-scrollbar { display: none; }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
 * {
   user-select: text;
   -webkit-user-select: text;

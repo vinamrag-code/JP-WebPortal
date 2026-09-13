@@ -12,13 +12,15 @@ import "./styles/transitions.css";
 import "./styles/layout.css";
 import Header from "./components/Header";
 import Navbar from "./components/Navbar";
-import Login from "./components/Login";
+import LoginScreen from "./uiv2/LoginScreen";
+import AppShell from "./uiv2/AppShell";
+import ProfileScreen from "./uiv2/ProfileScreen";
+import TimetableScreen from "./uiv2/TimetableScreen";
 import Attendance from "./components/Attendance";
 import Grades from "./components/Grades";
 import Exams from "./components/Exams";
 import Subjects from "./components/Subjects";
 import Profile from "./components/Profile";
-import Timetable from "./components/Timetable";
 import Fee from "./components/Fee";
 import AcademicCalendar from "./components/AcademicCalendar";
 import { Calendar as CalendarIcon } from "lucide-react";
@@ -39,7 +41,7 @@ import {
 import { serialize_payload } from "@/lib/jiitCrypto";
 import { proxy_url } from "@/lib/api";
 import { ArtificialWebPortal } from "./components/scripts/artificialW";
-import { saveProfileDataToCache } from '@/components/scripts/cache'
+import { saveProfileDataToCache, getRegisteredSubjectsFromCache, saveRegisteredSubjectsToCache } from '@/components/scripts/cache'
 import Feedback from "./components/Feedback";
 import CGPATargetCalculator from "./components/CGPATargetCalculator";
 
@@ -88,6 +90,42 @@ function AuthenticatedApp({
     };
     fetchProfileData();
   }, [w, profileData]);
+
+  // Prefetches the latest semester's registered subjects in the background so subject names (not just
+  // codes) are available on the Timetable screen even if the user never opens the Subjects page this
+  // session. Subjects.jsx shares this same `subjectData`/`subjectSemestersData` state and skips its own
+  // fetch for a semester that's already populated here.
+  const subjectPrefetchStarted = useRef(false);
+  useEffect(() => {
+    if (subjectPrefetchStarted.current) return undefined;
+    subjectPrefetchStarted.current = true;
+    let active = true;
+    const prefetchSubjects = async () => {
+      try {
+        const registeredSems = await w.get_registered_semesters();
+        const semestersList = Array.isArray(registeredSems) ? registeredSems : [];
+        const latest = semestersList[0] || null;
+        if (!active) return;
+        setSubjectSemestersData({ semesters: semestersList, latest_semester: latest });
+        if (!latest) return;
+
+        const username = w.username || getUsername() || 'user';
+        try {
+          const cached = await getRegisteredSubjectsFromCache(username, latest);
+          if (cached && active) setSubjectData((prev) => ({ ...prev, [latest.registration_id]: cached }));
+        } catch { /* ignore cache miss */ }
+
+        const data = await w.get_registered_subjects_and_faculties(latest);
+        if (!active) return;
+        setSubjectData((prev) => ({ ...prev, [latest.registration_id]: data }));
+        try { await saveRegisteredSubjectsToCache(data, username, latest); } catch { /* ignore cache write failure */ }
+      } catch (error) {
+        console.error("Failed to prefetch registered subjects:", error);
+      }
+    };
+    prefetchSubjects();
+    return () => { active = false; };
+  }, [w]);
 
   const [activeGradesTab, setActiveGradesTab] = useState("overview");
   const [gradeCardSemesters, setGradeCardSemesters] = useState([]);
@@ -200,29 +238,12 @@ function AuthenticatedApp({
   };
 
   return (
-    <div className="relative">
-      <Navbar
-        w={w}
-        messMenuOpen={messMenuOpen}
-        onMessMenuChange={onMessMenuChange}
-      />
-      <div
-        className="min-h-screen flex flex-col"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEndWithTransition}
-      >
-        <div className="flex-none z-30 bg-background md:ml-64">
-          <Header
-            setIsAuthenticated={setIsAuthenticated}
-            messMenuOpen={messMenuOpen}
-            onMessMenuChange={onMessMenuChange}
-            attendanceGoal={attendanceGoal}
-            setAttendanceGoal={setAttendanceGoal}
-            w={w}
-          />
-        </div>
-        <div className="flex-1 overflow-y-auto md:ml-64">
+    <div
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEndWithTransition}
+    >
+      <AppShell>
           <TransitionGroup component={null}>
             <CSSTransition
               key={location.pathname}
@@ -426,11 +447,9 @@ function AuthenticatedApp({
                   <Route
                     path="/profile"
                     element={
-                      <Profile
-                        w={w}
+                      <ProfileScreen
                         profileData={profileData}
-                        setProfileData={setProfileData}
-                        semesterData={gradesSemesterData}
+                        setIsAuthenticated={setIsAuthenticated}
                       />
                     }
                   />
@@ -447,12 +466,10 @@ function AuthenticatedApp({
                   <Route
                     path="/timetable"
                     element={
-                      <Timetable
-                        w={w}
-                        profileData={profileData}
-                        subjectData={subjectData}
-                        subjectSemestersData={subjectSemestersData}
-                        selectedSubjectsSem={selectedSubjectsSem}
+                      <TimetableScreen
+                        registeredSubjects={subjectData[subjectSemestersData?.latest_semester?.registration_id]?.subjects ?? []}
+                        attendance={attendanceData[attendanceSemestersData?.latest_semester?.registration_id] ?? null}
+                        attendanceGoal={attendanceGoal}
                       />
                     }
                   />
@@ -465,8 +482,7 @@ function AuthenticatedApp({
               </div>
             </CSSTransition>
           </TransitionGroup>
-        </div>
-      </div>
+      </AppShell>
     </div>
   );
 }
@@ -535,7 +551,7 @@ function LoginWrapper({ onLoginSuccess, w }) {
     }, 100);
   };
 
-  return <Login onLoginSuccess={handleLoginSuccess} w={w} />;
+  return <LoginScreen onLoginSuccess={handleLoginSuccess} w={w} />;
 }
 
 function App() {
