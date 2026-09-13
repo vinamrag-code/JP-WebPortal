@@ -15,25 +15,15 @@ function urgencyColor(pct, goal) {
   return "#ef8f8f";
 }
 
-function rowSnapshot(row, goal) {
-  return {
-    short: shortNameFor(row.name),
-    name: row.name,
-    time: row.startText,
-    room: row.room,
-    type: row.type,
-    hasPct: row.percent !== null,
-    pct: row.percent !== null ? Math.round(row.percent) : null,
-    color: urgencyColor(row.percent, goal),
-  };
-}
+const TYPE_LETTER = { L: "L", T: "T", P: "P" };
 
 /**
- * Home-screen widget snapshot: the current/next class plus a couple of upcoming ones, matching the design's
- * widget mock (short acronym name as the title, full name as a subtitle, attendance % badge per row).
- * `attendance` is the raw response `w.get_attendance()` already returned to the Attendance screen this
- * session (passed down from App.jsx's state) - the widget has no live portal session of its own, so it can
- * only show a percentage once the user has opened Attendance at least once.
+ * Home-screen widget snapshot: every class for the day (today, or the next day with classes once today's
+ * over), like jiit-widget's own widget - not just the current class plus a couple of upcoming ones, so an
+ * updated timetable with many classes left in the day shows all of them, scrollable, with finished classes
+ * dimmed rather than dropped. `attendance` is the raw response `w.get_attendance()` already returned to the
+ * Attendance screen this session (passed down from App.jsx's state) - the widget has no live portal session
+ * of its own, so a class's % only appears once the user has opened Attendance at least once.
  */
 export function buildWidgetSnapshot(attendance, goal = DEFAULT_ATTENDANCE_GOAL) {
   const schedule = loadSchedule().schedule;
@@ -42,17 +32,20 @@ export function buildWidgetSnapshot(attendance, goal = DEFAULT_ATTENDANCE_GOAL) 
   }
 
   const view = buildTodayView(schedule, attendance ?? null, { goal });
-  const active = view.isToday ? view.rows.find((r) => r.status === "now") : null;
-  const upcoming = (view.isToday ? view.rows.filter((r) => r.status === "upcoming") : view.rows).slice(0, 2);
-  const allDone = view.isToday && !active && view.rows.length > 0 && view.rows.every((r) => r.status === "finished");
 
   return {
     hasSchedule: true,
-    sectionLabel: view.isToday ? (active ? "Current Class" : "Next Class") : view.label,
-    hasActive: !!active,
-    active: active ? rowSnapshot(active, goal) : null,
-    allDone,
-    upcoming: upcoming.map((r) => rowSnapshot(r, goal)),
+    dayLabel: view.label,
+    rows: view.rows.map((r) => ({
+      short: shortNameFor(r.name, r.code),
+      time: r.startText,
+      type: TYPE_LETTER[r.type] ?? r.type,
+      room: r.room,
+      isFinished: r.status === "finished",
+      hasPct: r.percent !== null,
+      pctText: r.percent !== null ? `${Math.round(r.percent)}%` : "–",
+      color: urgencyColor(r.percent, goal),
+    })),
   };
 }
 

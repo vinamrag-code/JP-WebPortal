@@ -7,14 +7,24 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
-import android.view.View;
 import android.widget.RemoteViews;
+
+import androidx.core.widget.RemoteViewsCompat;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-/** Renders the JSON snapshot `WidgetBridgePlugin` stores into the home-screen widget's RemoteViews. */
+/**
+ * Home-screen widget: every class for the day (today, or the next day with classes once today's over),
+ * each with the subject's attendance percentage - ported from jiit-widget's own ScheduleWidgetProvider,
+ * which used the same `RemoteViewsCompat` dynamic-list approach to show the whole day rather than a fixed
+ * "current + 2 upcoming" cap.
+ *
+ * Renders only from the JSON snapshot `WidgetBridgePlugin` stores (itself built by the web app from local
+ * data - the saved timetable plus whatever attendance the Attendance screen has already cached this
+ * session); it never touches the network itself.
+ */
 public class ScheduleWidgetProvider extends AppWidgetProvider {
 
     @Override
@@ -34,101 +44,88 @@ public class ScheduleWidgetProvider extends AppWidgetProvider {
         String json = prefs.getString(WidgetBridgePlugin.KEY_SNAPSHOT, null);
 
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_schedule);
-        hideAll(views);
 
-        Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
-        if (launchIntent != null) {
-            PendingIntent pendingIntent = PendingIntent.getActivity(
-                context, 0, launchIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-            );
-            views.setOnClickPendingIntent(R.id.widget_root, pendingIntent);
-        }
+        PendingIntent openApp = PendingIntent.getActivity(
+            context, 0,
+            new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+        views.setOnClickPendingIntent(R.id.widget_header, openApp);
+        views.setOnClickPendingIntent(R.id.widget_empty, openApp);
+        // List rows can't hold their own PendingIntents; they fill in this template instead, and the
+        // template must be mutable for the fill-in to apply.
+        views.setPendingIntentTemplate(
+            R.id.widget_list,
+            PendingIntent.getActivity(
+                context, 1,
+                new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE
+            )
+        );
+        views.setEmptyView(R.id.widget_list, R.id.widget_empty);
 
-        if (json == null) {
-            showEmpty(views, "Open JP WebPortal to load your schedule");
-            appWidgetManager.updateAppWidget(appWidgetId, views);
-            return;
-        }
+        JSONArray rows = null;
+        String dayLabel = "Timetable";
+        String emptyMessage = "Open JP WebPortal to load your schedule";
 
-        try {
-            JSONObject data = new JSONObject(json);
-            if (!data.optBoolean("hasSchedule", false)) {
-                showEmpty(views, "Import your timetable in the app");
-                appWidgetManager.updateAppWidget(appWidgetId, views);
-                return;
-            }
-
-            boolean hasActive = data.optBoolean("hasActive", false);
-            boolean allDone = data.optBoolean("allDone", false);
-
-            if (hasActive) {
-                JSONObject active = data.getJSONObject("active");
-                views.setViewVisibility(R.id.widget_active_block, View.VISIBLE);
-                views.setTextViewText(R.id.widget_section_label, data.optString("sectionLabel", ""));
-                views.setTextViewText(R.id.widget_active_short, active.optString("short", ""));
-
-                String fullName = active.optString("name", "");
-                String shortName = active.optString("short", "");
-                // Only show the full-name subtitle when it actually adds information over the short label.
-                views.setTextViewText(R.id.widget_active_name, fullName.equalsIgnoreCase(shortName) ? "" : fullName);
-
-                String room = active.optString("room", "");
-                String time = active.optString("time", "");
-                views.setTextViewText(R.id.widget_active_time, room.isEmpty() ? time : time + " · " + room);
-
-                if (active.optBoolean("hasPct", false)) {
-                    int color = parseColor(active.optString("color", ""), 0xFF8B8FA3);
-                    views.setViewVisibility(R.id.widget_active_pct, View.VISIBLE);
-                    views.setTextViewText(R.id.widget_active_pct, active.optInt("pct", 0) + "%");
-                    views.setTextColor(R.id.widget_active_pct, color);
-                    views.setInt(R.id.widget_active_pct, "setBackgroundColor", withAlpha(color, 0x33));
+        if (json != null) {
+            try {
+                JSONObject data = new JSONObject(json);
+                if (data.optBoolean("hasSchedule", false)) {
+                    dayLabel = data.optString("dayLabel", "Today");
+                    rows = data.optJSONArray("rows");
+                    emptyMessage = "No classes";
+                } else {
+                    emptyMessage = "Import your timetable in the app";
                 }
-            } else if (allDone) {
-                views.setViewVisibility(R.id.widget_alldone, View.VISIBLE);
+            } catch (JSONException e) {
+                emptyMessage = "Open the app to refresh your schedule";
             }
-
-            JSONArray upcoming = data.optJSONArray("upcoming");
-            int[] rowIds = { R.id.widget_up_row1, R.id.widget_up_row2 };
-            int[] dotIds = { R.id.widget_up_dot1, R.id.widget_up_dot2 };
-            int[] nameIds = { R.id.widget_up_name1, R.id.widget_up_name2 };
-            int[] timeIds = { R.id.widget_up_time1, R.id.widget_up_time2 };
-            int[] pctIds = { R.id.widget_up_pct1, R.id.widget_up_pct2 };
-            if (upcoming != null && upcoming.length() > 0) {
-                views.setViewVisibility(R.id.widget_upcoming_header, View.VISIBLE);
-            }
-            for (int i = 0; i < rowIds.length; i++) {
-                if (upcoming != null && i < upcoming.length()) {
-                    JSONObject u = upcoming.getJSONObject(i);
-                    int color = parseColor(u.optString("color", ""), 0xFF8B8FA3);
-                    views.setViewVisibility(rowIds[i], View.VISIBLE);
-                    views.setInt(dotIds[i], "setColorFilter", color);
-                    views.setTextViewText(nameIds[i], u.optString("short", u.optString("name", "")));
-                    views.setTextViewText(timeIds[i], u.optString("time", ""));
-                    if (u.optBoolean("hasPct", false)) {
-                        views.setViewVisibility(pctIds[i], View.VISIBLE);
-                        views.setTextViewText(pctIds[i], u.optInt("pct", 0) + "%");
-                        views.setTextColor(pctIds[i], color);
-                    }
-                }
-            }
-        } catch (JSONException e) {
-            showEmpty(views, "Open the app to refresh your schedule");
         }
+
+        views.setTextViewText(R.id.widget_title, dayLabel);
+        views.setTextViewText(R.id.widget_status, "");
+        views.setTextViewText(R.id.widget_empty, emptyMessage);
+
+        RemoteViewsCompat.RemoteCollectionItems.Builder itemsBuilder =
+            new RemoteViewsCompat.RemoteCollectionItems.Builder().setViewTypeCount(1);
+        if (rows != null) {
+            for (int i = 0; i < rows.length(); i++) {
+                JSONObject row = rows.optJSONObject(i);
+                if (row != null) itemsBuilder.addItem(i, buildRow(context, row));
+            }
+        }
+        RemoteViewsCompat.setRemoteAdapter(context, views, appWidgetId, R.id.widget_list, itemsBuilder.build());
 
         appWidgetManager.updateAppWidget(appWidgetId, views);
     }
 
-    private static void hideAll(RemoteViews views) {
-        views.setViewVisibility(R.id.widget_active_block, View.GONE);
-        views.setViewVisibility(R.id.widget_active_pct, View.GONE);
-        views.setViewVisibility(R.id.widget_alldone, View.GONE);
-        views.setViewVisibility(R.id.widget_upcoming_header, View.GONE);
-        views.setViewVisibility(R.id.widget_up_row1, View.GONE);
-        views.setViewVisibility(R.id.widget_up_row2, View.GONE);
-        views.setViewVisibility(R.id.widget_up_pct1, View.GONE);
-        views.setViewVisibility(R.id.widget_up_pct2, View.GONE);
-        views.setViewVisibility(R.id.widget_empty, View.GONE);
+    private static RemoteViews buildRow(Context context, JSONObject row) {
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_row);
+
+        String subject = row.optString("short", "");
+        String time = row.optString("time", "");
+        String type = row.optString("type", "");
+        String room = row.optString("room", "");
+        boolean isFinished = row.optBoolean("isFinished", false);
+        boolean hasPct = row.optBoolean("hasPct", false);
+
+        StringBuilder details = new StringBuilder(time);
+        if (!type.isEmpty()) details.append(" · ").append(type);
+        if (!room.isEmpty()) details.append(" · ").append(room);
+
+        views.setTextViewText(R.id.row_subject, subject);
+        views.setTextViewText(R.id.row_details, details.toString());
+        views.setTextViewText(R.id.row_attendance, hasPct ? row.optString("pctText", "–") : "–");
+
+        int mutedColor = 0xFF8B8FA3;
+        int subjectColor = isFinished ? mutedColor : 0xFFE8E9F0;
+        int attendanceColor = isFinished || !hasPct ? mutedColor : parseColor(row.optString("color", ""), mutedColor);
+        views.setTextColor(R.id.row_subject, subjectColor);
+        views.setTextColor(R.id.row_attendance, attendanceColor);
+
+        views.setOnClickFillInIntent(R.id.row_root, new Intent());
+        return views;
     }
 
     private static int parseColor(String hex, int fallback) {
@@ -137,14 +134,5 @@ public class ScheduleWidgetProvider extends AppWidgetProvider {
         } catch (Exception e) {
             return fallback;
         }
-    }
-
-    private static int withAlpha(int color, int alpha) {
-        return (color & 0x00FFFFFF) | (alpha << 24);
-    }
-
-    private static void showEmpty(RemoteViews views, String message) {
-        views.setTextViewText(R.id.widget_empty, message);
-        views.setViewVisibility(R.id.widget_empty, View.VISIBLE);
     }
 }

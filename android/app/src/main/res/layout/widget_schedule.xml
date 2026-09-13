@@ -3,231 +3,56 @@
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@drawable/widget_background"
-    android:padding="14dp">
+    android:orientation="vertical"
+    android:padding="12dp">
 
     <LinearLayout
+        android:id="@+id/widget_header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="8dp">
-        <FrameLayout
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:background="@drawable/widget_icon_box"
-            android:layout_marginEnd="7dp">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:text="🧭"
-                android:textSize="11sp" />
-        </FrameLayout>
+        android:orientation="horizontal"
+        android:paddingBottom="6dp">
+
         <TextView
+            android:id="@+id/widget_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="JP WebPortal"
-            android:textColor="#e8e9f0"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:maxLines="1"
-            android:ellipsize="end" />
-        <ImageView
-            android:layout_width="6dp"
-            android:layout_height="6dp"
-            android:src="@drawable/widget_dot"
-            android:tint="#4ADE80" />
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/widget_empty"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textColor="#8b8fa3"
-        android:textSize="11sp"
-        android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/widget_alldone"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="🌙 No more classes today"
-        android:textColor="#8b8fa3"
-        android:textSize="11.5sp"
-        android:visibility="gone" />
-
-    <LinearLayout
-        android:id="@+id/widget_active_block"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:background="@drawable/widget_active_bg"
-        android:padding="10dp"
-        android:layout_marginBottom="6dp"
-        android:visibility="gone">
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="1dp">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="▶"
-                android:textColor="#c8bfff"
-                android:textSize="8sp"
-                android:layout_marginEnd="4dp" />
-            <TextView
-                android:id="@+id/widget_section_label"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textColor="#c8bfff"
-                android:textSize="9.5sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-            <TextView
-                android:id="@+id/widget_active_short"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textColor="#f2f2f7"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:maxLines="1"
-                android:ellipsize="end" />
-            <TextView
-                android:id="@+id/widget_active_pct"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/widget_pct_bg"
-                android:paddingStart="9dp"
-                android:paddingEnd="9dp"
-                android:paddingTop="2dp"
-                android:paddingBottom="2dp"
-                android:textSize="10.5sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
-        </LinearLayout>
-        <TextView
-            android:id="@+id/widget_active_name"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="#8b8fa3"
-            android:textSize="11sp"
-            android:maxLines="1"
-            android:ellipsize="end" />
-        <TextView
-            android:id="@+id/widget_active_time"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textColor="#8b8fa3"
-            android:textSize="10.5sp"
-            android:maxLines="1"
             android:ellipsize="end"
-            android:layout_marginTop="1dp" />
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/widget_upcoming_header"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="☰ UPCOMING"
-        android:textColor="#8b8fa3"
-        android:textSize="9sp"
-        android:textStyle="bold"
-        android:layout_marginTop="2dp"
-        android:visibility="gone" />
-
-    <LinearLayout
-        android:id="@+id/widget_up_row1"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingTop="3dp"
-        android:paddingBottom="3dp"
-        android:visibility="gone">
-        <ImageView
-            android:id="@+id/widget_up_dot1"
-            android:layout_width="6dp"
-            android:layout_height="6dp"
-            android:layout_marginEnd="8dp"
-            android:src="@drawable/widget_dot" />
-        <TextView
-            android:id="@+id/widget_up_name1"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:textColor="#e8e9f0"
-            android:textSize="11.5sp"
-            android:textStyle="bold"
             android:maxLines="1"
-            android:ellipsize="end" />
-        <TextView
-            android:id="@+id/widget_up_time1"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#8b8fa3"
-            android:textSize="10.5sp"
-            android:layout_marginEnd="6dp" />
-        <TextView
-            android:id="@+id/widget_up_pct1"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="10.5sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/widget_up_row2"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingTop="3dp"
-        android:paddingBottom="3dp"
-        android:visibility="gone">
-        <ImageView
-            android:id="@+id/widget_up_dot2"
-            android:layout_width="6dp"
-            android:layout_height="6dp"
-            android:layout_marginEnd="8dp"
-            android:src="@drawable/widget_dot" />
-        <TextView
-            android:id="@+id/widget_up_name2"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:textColor="#e8e9f0"
-            android:textSize="11.5sp"
-            android:textStyle="bold"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:maxLines="1"
-            android:ellipsize="end" />
-        <TextView
-            android:id="@+id/widget_up_time2"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
             android:textColor="#8b8fa3"
-            android:textSize="10.5sp"
-            android:layout_marginEnd="6dp" />
-        <TextView
-            android:id="@+id/widget_up_pct2"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="10.5sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
+            android:textSize="11sp" />
     </LinearLayout>
 
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <ListView
+            android:id="@+id/widget_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:divider="@null"
+            android:dividerHeight="0dp" />
+
+        <TextView
+            android:id="@+id/widget_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:textColor="#8b8fa3"
+            android:textSize="13sp" />
+    </FrameLayout>
 </LinearLayout>

@@ -118,12 +118,33 @@ export function unmatchedCodes(timetableCodes, attendance, codeAliases = {}) {
 const NAME_STOPWORDS = new Set(["and", "of", "the", "using", "for", "to", "in", "on", "a", "an", "&"]);
 
 /**
- * A short label for a subject's full name, for tight spaces like the home-screen widget - an acronym of its
- * significant words (e.g. "Analog And Digital Communication" -> "ADC"), with a trailing "Lab" kept as a word
- * rather than folded into the acronym (e.g. "...Communication Lab" -> "ADC Lab"). Names too short to usefully
- * abbreviate (a single significant word) are returned unchanged.
+ * Hand-picked short names for JIIT-128 E1's own subjects, carried over verbatim from the original
+ * jiit-widget's `ScheduleBuilder.shortNames` map (keyed by timetable code, since names/casing vary but
+ * codes are stable). These read far more naturally than any generic algorithm could ("Cloud & Edge" vs.
+ * an acronym like "CEC") - real subject names don't abbreviate by one consistent rule, so this is a lookup
+ * table, not a formula. `shortNameFor` falls back to the acronym algorithm below for any other code.
  */
-export function shortNameFor(fullName) {
+const KNOWN_SHORT_NAMES = {
+  "18B11EC212": "ADC",
+  "18B15EC212": "ADC Lab",
+  "18B12MA312": "Logical Reasoning",
+  "20B13HS311": "Indian Constitution",
+  "24B41EC311": "OS Concepts",
+  "24B45EC311": "OS Lab",
+  "26B42EC311": "Cloud & Edge",
+  "26B42EC313": "VLSI (Verilog)",
+};
+
+/**
+ * A short label for a subject, for tight spaces like the home-screen widget. Checks `KNOWN_SHORT_NAMES` by
+ * code first; otherwise falls back to an acronym of `fullName`'s significant words (e.g. "Analog And
+ * Digital Communication" -> "ADC"), with a trailing "Lab" kept as a word rather than folded into the
+ * acronym (e.g. "...Communication Lab" -> "ADC Lab"). Names too short to usefully abbreviate (a single
+ * significant word) are returned unchanged.
+ */
+export function shortNameFor(fullName, code) {
+  const known = code && KNOWN_SHORT_NAMES[normaliseCode(code)];
+  if (known) return known;
   if (!fullName) return fullName;
   const words = fullName.trim().split(/\s+/).filter(Boolean);
   let core = words;

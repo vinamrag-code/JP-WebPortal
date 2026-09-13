@@ -98,4 +98,12 @@ describe("shortNameFor", () => {
     expect(shortNameFor("")).toBe("");
     expect(shortNameFor(null)).toBe(null);
   });
+
+  it("prefers a known hand-picked short name (by code) over the acronym algorithm", () => {
+    expect(shortNameFor("CLOUD AND EDGE COMPUTING", "26B42EC311")).toBe("Cloud & Edge");
+    expect(shortNameFor("OPERATING SYSTEM CONCEPTS", "24B41EC311")).toBe("OS Concepts");
+    expect(shortNameFor("OPERATING SYSTEM CONCEPTS", "24b41ec311")).toBe("OS Concepts"); // case-insensitive code match
+    // No known entry for this code -> falls back to the acronym algorithm.
+    expect(shortNameFor("Design Principles of VLSI Systems using Verilog", "99Z00XX000")).toBe("DPVSV");
+  });
 });

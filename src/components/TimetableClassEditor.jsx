@@ -62,6 +62,26 @@ export default function TimetableClassEditor({ open, onOpenChange, initial, exis
       .sort((a, b) => a.name.localeCompare(b.name)),
     [registeredSubjects],
   );
+  // Registered subjects have one row per L/T/P component, each with its own faculty - grouped here so
+  // picking a subject (and later, its class type) can auto-fill the right teacher for that component.
+  const componentsByCode = useMemo(() => {
+    const map = new Map();
+    for (const s of registeredSubjects) {
+      const subjCode = normaliseCode(s.subject_code ?? s.subjectcode);
+      const compType = s.subject_component_code ?? s.subjectcomponentcode;
+      const teacher = (s.employee_name ?? "").trim();
+      if (!subjCode || !teacher) continue;
+      if (!map.has(subjCode)) map.set(subjCode, []);
+      map.get(subjCode).push({ type: compType, teacher });
+    }
+    return map;
+  }, [registeredSubjects]);
+  const teacherFor = (subjCode, forType) => {
+    const components = componentsByCode.get(subjCode);
+    if (!components?.length) return null;
+    return (components.find((c) => c.type === forType) ?? components[0]).teacher;
+  };
+
   const initialMatch = subjectOptions.find((s) => s.code === normaliseCode(initial?.code ?? ""));
   const [selectedSubject, setSelectedSubject] = useState(() => {
     if (initial) return initialMatch ? initialMatch.code : CUSTOM_SUBJECT;
@@ -75,6 +95,16 @@ export default function TimetableClassEditor({ open, onOpenChange, initial, exis
     if (match) {
       setCode(match.code);
       setName(match.name);
+      const teacher = teacherFor(match.code, type);
+      if (teacher) setTeachers(teacher);
+    }
+  };
+
+  const handleTypeSelect = (value) => {
+    setType(value);
+    if (selectedSubject && selectedSubject !== CUSTOM_SUBJECT) {
+      const teacher = teacherFor(selectedSubject, value);
+      if (teacher) setTeachers(teacher);
     }
   };
 
@@ -126,7 +156,7 @@ export default function TimetableClassEditor({ open, onOpenChange, initial, exis
             </div>
             <div className="space-y-1.5">
               <Label>Type</Label>
-              <Select value={type} onValueChange={setType}>
+              <Select value={type} onValueChange={handleTypeSelect}>
                 <SelectTrigger data-testid="type-select"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {TYPE_OPTIONS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
