@@ -42,7 +42,8 @@ Local work on top of [J2V-k/jportal-vhost](https://github.com/J2V-k/jportal-vhos
 | J1.5 | **Shared logic**: schedule data model + persistence, portal/PDF subject-code matching (incl. code aliases), "Today" view logic, widget-snapshot JSON contract | ✅ Done |
 | J2 | **Upload and review UI** on the Timetable page: upload PDF → pick batch and electives → preview (with parser warnings) → save into JPortal's timetable; richer editor (type, room, teacher) | ✅ Done |
 | J3 | **Today section** component on the Timetable and Attendance pages, wired to the real app (`w`) using J1.5's `today.js` | ✅ Done |
-| J4 | **Mobile app** (Capacitor): Android project builds an installable APK, and portal login/attendance work inside the app; iOS project scaffolded (build needs a Mac) | ⏭️ Next |
+| J4 | **Mobile app** (Capacitor): Android project builds an installable APK; iOS project not yet scaffolded (build needs a Mac) | ✅ Android build works; iOS not started |
+| J4b | **New UI design import & implementation** ("JP WebPortal" Nocturne-theme redesign: 7 screens + bottom nav + home-screen widget mockup, from a Claude Design canvas) — reskin the real app to match, wiring each screen to real portal data | ⏭️ Next |
 | J5 | **Home-screen widgets:** widget-snapshot bridge plugin; Android widget (port from `~/projects/jiit-jportal/jiit-widget`), built and tested here; iOS WidgetKit extension written, built on a Mac | ⏳ |
 | J6 | **Background refresh** (Android WorkManager; iOS WidgetKit timeline within its limits) with a stale indicator; secure native credential handling (Keystore / Keychain), never plaintext | ⏳ |
 
@@ -187,6 +188,88 @@ genuinely depends on the shared logic, not a copy of it); bypassing the editor's
 build (`vite build`) succeeds; the pre-existing files touched (`Timetable.jsx`, `Attendance.jsx`, `App.jsx`)
 gained no new lint errors beyond one line matching a pattern (missing PropTypes) already present on every other
 prop in that file — confirmed by comparing before/after `eslint` output line by line, not just checking exit codes.
+
+## J4: Capacitor Android wrapper (Android build done, iOS not started)
+
+Wraps the existing built web app (dist/) as a native Android app, so the whole real JPortal — including the J2/J3
+timetable upload, editor and Today section — runs as an installable APK, not just a browser tab.
+
+- **App identity**: `appId com.jportal.app`, `appName "JP WebPortal"` (different from `~/projects/jiit-jportal/jiit-widget`'s
+  `com.vinamra.jiitwidget`, so both can be installed on the same phone without conflict).
+- **Toolchain additions** (all local, no root, nothing shared with `jiit-widget` touched):
+  - **Node 22** at `~/.local/node22` — Capacitor 8's CLI refuses to run under Node <22; the system/other-projects'
+    Node 20 is untouched. Use `export PATH=~/.local/node22/bin:$PATH` for any `cap` command.
+  - **JDK 21** at `~/.local/jdk-21` — Capacitor 8's Android Gradle module needs Java 21 to compile (`invalid source
+    release: 21` under JDK 17). `jiit-widget`'s own Gradle build stays on JDK 17 (`~/.local/jdk-17`), unaffected —
+    use `export JAVA_HOME=~/.local/jdk-21` only for this repo's `android/` build.
+  - **Android SDK platform 36 + build-tools 36.0.0** installed into the existing `~/Android/Sdk` (platform 35/
+    build-tools 35 from the jiit-widget setup are untouched, both coexist) — Capacitor 8's `android/variables.gradle`
+    targets/compiles against SDK 36.
+- **What's committed**: the native `android/` project (manifest, Capacitor's own bridge plugin sources, Gradle
+  wrapper, `variables.gradle`) — everything Capacitor's own generated `android/.gitignore` doesn't already exclude
+  (`build/`, `.gradle/`, `local.properties`). 56 files, ~1600 lines, no build output.
+- **Build command**:
+  ```bash
+  export PATH=~/.local/node22/bin:$PATH JAVA_HOME=~/.local/jdk-21
+  cd ~/projects/jiit-jportal/jportal && npx pnpm@10 run build && npx pnpm@10 exec cap sync android
+  cd android && echo "sdk.dir=$HOME/Android/Sdk" > local.properties && ./gradlew assembleDebug
+  # APK at android/app/src/main/assets → app/build/outputs/apk/debug/app-debug.apk
+  ```
+- **Verified**: `assembleDebug` succeeds (manifest merge, resource compilation for every locale, dexing, packaging
+  all pass); the built APK was unzipped and scanned — no credentials or the timetable PDF leaked in; `aapt2 dump
+  badging` confirms `com.jportal.app`, targetSdk 36, and the `INTERNET` permission (required for portal calls).
+- **Not verified here**: actual on-device/emulator behavior. There is no display and no KVM on this dev machine
+  (same constraint as `jiit-widget`), so whether the WebView actually loads the app and completes a real login has
+  not been checked interactively — only that the Gradle build itself succeeds. **The owner's phone is the first
+  real test of this APK**, same as `jiit-widget` v0.1 was.
+- **iOS**: not started. `npx cap add ios` needs Xcode (macOS-only); the Node/JS side (web build, Capacitor config)
+  is already platform-neutral and ready for it whenever a Mac is available.
+
+## J4b: New UI design import (read, not yet implemented)
+
+On 13 Sep the owner shared a Claude Design canvas — `claude.ai/design/p/c9761a04-842d-42d7-bc94-6c272e0ca578`,
+project "# JIIT Campus App Design", file `JP WebPortal.dc.html` — and asked to implement it and ship an APK.
+Given the size (a full app-shell redesign, not a component tweak), the APK above was shipped first as J4 so there
+is something real to test while J4b is scoped; **J4b itself has not been started**.
+
+**What the design contains** (read via the `DesignSync` tool after `/design-login`; full content saved for
+reference — see the design system's own `_ds/nocturne-…/readme.md` and `styles.css` for the token source):
+- **Visual language ("Nocturne")**: dark theme by default (`#161826` bg, `#232532` surface, `#9184d9` accent purple,
+  Inter font), a light theme variant, Phosphor icons, card/chip/segmented-control/dialog primitives already defined
+  as reusable CSS classes in the design system bundle.
+- **App shell**: login screen → bottom-nav app with 5 tabs (Attendance, Grades, Timetable, Exams, Subjects) plus a
+  Profile screen (reached via a top-bar icon, not the bottom nav) and a full-screen Edit-Timetable grid editor.
+- **Screens, each substantially different from JPortal's current pages**:
+  - *Attendance*: Overview (ring-chart cards per subject, target-goal input) / Day-to-day (calendar + daily log)
+    tabs, plus a per-subject detail screen with a "reach your target" slider calculator.
+  - *Timetable*: Day view (chip day-picker + list) / Week view (6-column mini-grid) toggle, plus a separate
+    Edit-Timetable screen: a 10-slot × 6-day tap-to-add/remove grid with an add/delete dialog.
+  - *Exams*: semester + exam-event pickers, a dated list with seat numbers and a "SOON" badge on the nearest exam.
+  - *Grades*: Overview (SGPA/CGPA line chart + per-semester GP/credits cards) / Marks (per-test progress bars) /
+    Semester (expandable grade lists) tabs.
+  - *Subjects*: Registered (credit total + L/T/P component badges, filterable) / Choices / MOOC tabs.
+  - *Profile*: avatar-initials, a field list, a link to Subjects, logout.
+  - *Home-screen widget mockup*: a card showing the current/next class with room, time and attendance %, plus an
+    "Upcoming" list — a design target for the eventual native widget (J5), not itself code to run.
+- **Demo data only**: every screen is driven by hardcoded arrays (`SUBJECTS`, `TIMETABLE`, `EXAM_GROUPS_RAW`,
+  `GRADE_HISTORY`, `DAILY_LOG`) in the canvas's own template script — none of it calls `w.*` or reads real portal
+  data. The canvas's own timetable editor (`EDIT_GRID`, add/remove dialog) is a from-scratch grid, unrelated to and
+  not integrated with our J1–J3 PDF-parser/schedule/editor pipeline.
+
+**Reconciling with J1–J3**: the design's Timetable tab (day/week view + its own grid editor) and Attendance tab
+overlap substantially with what `ScheduleGrid.jsx`, `TimetableClassEditor.jsx`, `TodaySection.jsx`, and the
+`Attendance.jsx`/`Timetable.jsx` pages already do with real data. J4b's job is to restyle those real, working
+pieces to match this visual language (cards, dark theme, bottom nav, chips) rather than to build the mockup's demo
+version from scratch a second time — the design should be read as **the target look**, with our existing
+J1–J3 logic underneath, not as a parallel app to wire up independently. Grades/Exams/Subjects have no equivalent
+built yet on our side (JPortal's existing `Grades.jsx`/`Exams.jsx`/`Subjects.jsx` pages already fetch real data;
+J4b would restyle those to match too).
+
+**Suggested scope for when J4b actually starts** (not yet agreed with the owner — propose and confirm first):
+1. Global shell: dark/light theme tokens, bottom nav, top bar, applied around the existing routed pages.
+2. Attendance + Timetable screens restyled against real data (most direct win, most overlap with J1–J3).
+3. Grades / Exams / Subjects restyled against their existing real data sources.
+4. Home-screen widget visual redesign, once J5 (the actual native widget) exists to redesign.
 
 ## J1.5: Schedule model, subject matching, Today/widget-snapshot logic (done)
 
