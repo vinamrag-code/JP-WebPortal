@@ -15,12 +15,12 @@ import Navbar from "./components/Navbar";
 import LoginScreen from "./uiv2/LoginScreen";
 import AppShell from "./uiv2/AppShell";
 import ProfileScreen from "./uiv2/ProfileScreen";
+import TimetableScreen from "./uiv2/TimetableScreen";
 import Attendance from "./components/Attendance";
 import Grades from "./components/Grades";
 import Exams from "./components/Exams";
 import Subjects from "./components/Subjects";
 import Profile from "./components/Profile";
-import Timetable from "./components/Timetable";
 import Fee from "./components/Fee";
 import AcademicCalendar from "./components/AcademicCalendar";
 import { Calendar as CalendarIcon } from "lucide-react";
@@ -430,13 +430,8 @@ function AuthenticatedApp({
                   <Route
                     path="/timetable"
                     element={
-                      <Timetable
-                        w={w}
-                        profileData={profileData}
-                        subjectData={subjectData}
-                        subjectSemestersData={subjectSemestersData}
-                        selectedSubjectsSem={selectedSubjectsSem}
-                        attendanceGoal={attendanceGoal}
+                      <TimetableScreen
+                        registeredSubjects={subjectData[subjectSemestersData?.latest_semester?.registration_id]?.subjects ?? []}
                       />
                     }
                   />
