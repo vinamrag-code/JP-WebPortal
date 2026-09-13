@@ -1,22 +1,25 @@
 // @vitest-environment node
 import fs from "fs";
-import os from "os";
 import path from "path";
 import process from "process";
+import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import { extractPdfPages, parseTimetablePages, selectEntriesForStudent } from "./pdfTimetableParser";
 
 /**
- * Golden test against the real official PDF. The PDF is not committed; point TIMETABLE_PDF at it, or keep it at the
- * default path below. Skipped when absent.
+ * Golden test against the real official PDF. The PDF is not committed; point TIMETABLE_PDF at it, or keep it in the
+ * sibling `assets/` folder at the default path below (`~/projects/jiit-jportal/assets/` alongside this repo).
+ * Skipped when absent.
  *
- * Expected E1 result = the 22 slots verified three ways in ~/jiit-widget Phase 5 (against the rendered pages, against
+ * Expected E1 result = the 22 slots verified three ways in jiit-widget Phase 5 (against the rendered pages, against
  * jiit-planner-cdn, and against the portal's own per-class attendance records).
  */
+// src/lib/timetable/ -> jportal/ -> jiit-jportal/ (4 levels up from this file's directory)
+const PROJECT_ROOT = fileURLToPath(new URL("../../../..", import.meta.url));
 const PDF_PATH =
   process.env.TIMETABLE_PDF ??
-  path.join(os.homedir(), "Documents", "2026_ B. Tech.  III Yr(V SEMESTER) TIMETABLE ODD SEMESTER 2026, JIIT-128 - Sheet2.pdf");
+  path.join(PROJECT_ROOT, "assets", "2026_ B. Tech.  III Yr(V SEMESTER) TIMETABLE ODD SEMESTER 2026, JIIT-128 - Sheet2.pdf");
 const available = fs.existsSync(PDF_PATH);
 
 const EXPECTED_E1 = [
