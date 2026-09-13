@@ -453,6 +453,7 @@ function AuthenticatedApp({
                         subjectData={subjectData}
                         subjectSemestersData={subjectSemestersData}
                         selectedSubjectsSem={selectedSubjectsSem}
+                        attendanceGoal={attendanceGoal}
                       />
                     }
                   />

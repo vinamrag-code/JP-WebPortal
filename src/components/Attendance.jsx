@@ -35,6 +35,7 @@ import {
 import { Helmet } from 'react-helmet-async';
 import { proxy_url } from '@/lib/api';
 import { calculateClassesNeeded, calculateClassesCanMiss } from '@/lib/math';
+import TodaySection from './TodaySection';
 
 const CACHE_DURATION = 4 * 60 * 60 * 1000;
 
@@ -641,6 +642,9 @@ const Attendance = ({
         <title>Attendance - JP Portal | JIIT Student Portal</title>
       </Helmet>
       <div className="text-foreground font-sans">
+        <div className="px-3 pt-3 max-w-[1440px] mx-auto">
+          <TodaySection w={w} attendanceGoal={attendanceGoal} />
+        </div>
         <div className="top-14 left-0 right-0 bg-background z-10">
           <div className="flex gap-2 py-2 px-3 max-w-[1440px] mx-auto">
             <Select onValueChange={handleSemesterChange} value={selectedSem?.registration_id}>
