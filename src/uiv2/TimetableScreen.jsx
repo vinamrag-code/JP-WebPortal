@@ -32,7 +32,7 @@ function todayDayIndex() {
  * `PdfTimetableImport`/`ScheduleGrid` already produce and edit) — this screen only adds a new way to browse
  * it; saving, editing, and the PDF importer are the exact same components and logic, unchanged.
  */
-export default function TimetableScreen({ registeredSubjects = [] }) {
+export default function TimetableScreen({ registeredSubjects = [], attendance = null, attendanceGoal }) {
   const [schedule, setSchedule] = useState(() => loadSchedule().schedule);
   const [selectedDay, setSelectedDay] = useState(todayDayIndex());
   const [mode, setMode] = useState("view"); // 'view' | 'edit' | 'import'
@@ -43,8 +43,8 @@ export default function TimetableScreen({ registeredSubjects = [] }) {
   const nameFor = (c) => namesByCode.get(attendanceCodeFor(c.code, schedule?.codeAliases)) || (c.name && c.name !== c.code ? c.name : c.code);
 
   useEffect(() => {
-    syncWidgetData();
-  }, [schedule]);
+    syncWidgetData(attendance, attendanceGoal);
+  }, [schedule, attendance, attendanceGoal]);
 
   const handleSaveClass = (original, updated, portalAlias) => {
     try {
@@ -71,7 +71,7 @@ export default function TimetableScreen({ registeredSubjects = [] }) {
 
   const handleAddWidget = async () => {
     try {
-      await requestPinHomeScreenWidget();
+      await requestPinHomeScreenWidget(attendance, attendanceGoal);
     } catch (err) {
       showWarningToast("Add Widget", err?.message || "Could not add the widget.");
     }
@@ -199,4 +199,6 @@ export default function TimetableScreen({ registeredSubjects = [] }) {
 
 TimetableScreen.propTypes = {
   registeredSubjects: PropTypes.array,
+  attendance: PropTypes.object,
+  attendanceGoal: PropTypes.number,
 };

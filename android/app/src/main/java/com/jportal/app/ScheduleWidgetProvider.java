@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.view.View;
 import android.widget.RemoteViews;
 
@@ -65,10 +66,24 @@ public class ScheduleWidgetProvider extends AppWidgetProvider {
                 JSONObject active = data.getJSONObject("active");
                 views.setViewVisibility(R.id.widget_active_block, View.VISIBLE);
                 views.setTextViewText(R.id.widget_section_label, data.optString("sectionLabel", ""));
-                views.setTextViewText(R.id.widget_active_name, active.optString("name", ""));
+                views.setTextViewText(R.id.widget_active_short, active.optString("short", ""));
+
+                String fullName = active.optString("name", "");
+                String shortName = active.optString("short", "");
+                // Only show the full-name subtitle when it actually adds information over the short label.
+                views.setTextViewText(R.id.widget_active_name, fullName.equalsIgnoreCase(shortName) ? "" : fullName);
+
                 String room = active.optString("room", "");
                 String time = active.optString("time", "");
                 views.setTextViewText(R.id.widget_active_time, room.isEmpty() ? time : time + " · " + room);
+
+                if (active.optBoolean("hasPct", false)) {
+                    int color = parseColor(active.optString("color", ""), 0xFF8B8FA3);
+                    views.setViewVisibility(R.id.widget_active_pct, View.VISIBLE);
+                    views.setTextViewText(R.id.widget_active_pct, active.optInt("pct", 0) + "%");
+                    views.setTextColor(R.id.widget_active_pct, color);
+                    views.setInt(R.id.widget_active_pct, "setBackgroundColor", withAlpha(color, 0x33));
+                }
             } else if (allDone) {
                 views.setViewVisibility(R.id.widget_alldone, View.VISIBLE);
             }
@@ -78,16 +93,23 @@ public class ScheduleWidgetProvider extends AppWidgetProvider {
             int[] dotIds = { R.id.widget_up_dot1, R.id.widget_up_dot2 };
             int[] nameIds = { R.id.widget_up_name1, R.id.widget_up_name2 };
             int[] timeIds = { R.id.widget_up_time1, R.id.widget_up_time2 };
+            int[] pctIds = { R.id.widget_up_pct1, R.id.widget_up_pct2 };
             if (upcoming != null && upcoming.length() > 0) {
                 views.setViewVisibility(R.id.widget_upcoming_header, View.VISIBLE);
             }
             for (int i = 0; i < rowIds.length; i++) {
                 if (upcoming != null && i < upcoming.length()) {
                     JSONObject u = upcoming.getJSONObject(i);
+                    int color = parseColor(u.optString("color", ""), 0xFF8B8FA3);
                     views.setViewVisibility(rowIds[i], View.VISIBLE);
-                    views.setInt(dotIds[i], "setColorFilter", typeColor(u.optString("type", "")));
-                    views.setTextViewText(nameIds[i], u.optString("name", ""));
+                    views.setInt(dotIds[i], "setColorFilter", color);
+                    views.setTextViewText(nameIds[i], u.optString("short", u.optString("name", "")));
                     views.setTextViewText(timeIds[i], u.optString("time", ""));
+                    if (u.optBoolean("hasPct", false)) {
+                        views.setViewVisibility(pctIds[i], View.VISIBLE);
+                        views.setTextViewText(pctIds[i], u.optInt("pct", 0) + "%");
+                        views.setTextColor(pctIds[i], color);
+                    }
                 }
             }
         } catch (JSONException e) {
@@ -99,18 +121,26 @@ public class ScheduleWidgetProvider extends AppWidgetProvider {
 
     private static void hideAll(RemoteViews views) {
         views.setViewVisibility(R.id.widget_active_block, View.GONE);
+        views.setViewVisibility(R.id.widget_active_pct, View.GONE);
         views.setViewVisibility(R.id.widget_alldone, View.GONE);
         views.setViewVisibility(R.id.widget_upcoming_header, View.GONE);
         views.setViewVisibility(R.id.widget_up_row1, View.GONE);
         views.setViewVisibility(R.id.widget_up_row2, View.GONE);
+        views.setViewVisibility(R.id.widget_up_pct1, View.GONE);
+        views.setViewVisibility(R.id.widget_up_pct2, View.GONE);
         views.setViewVisibility(R.id.widget_empty, View.GONE);
     }
 
-    private static int typeColor(String type) {
-        if ("L".equals(type)) return 0xFF60A5FA;
-        if ("T".equals(type)) return 0xFFF5A524;
-        if ("P".equals(type)) return 0xFF4ADE80;
-        return 0xFF8B8FA3;
+    private static int parseColor(String hex, int fallback) {
+        try {
+            return Color.parseColor(hex);
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return (color & 0x00FFFFFF) | (alpha << 24);
     }
 
     private static void showEmpty(RemoteViews views, String message) {

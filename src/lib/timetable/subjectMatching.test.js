@@ -5,6 +5,7 @@ import {
   extractSubjectCode,
   extractSubjectName,
   rankBatches,
+  shortNameFor,
   subjectNamesByCode,
   suggestElectives,
   unmatchedCodes,
@@ -78,5 +79,23 @@ describe("attendance joining", () => {
 
     const after = unmatchedCodes(["24B41EC311", "26B42EC313"], attendanceRows, { "26B42EC313": "25B22EC311" });
     expect(after.timetable).toEqual([]);
+  });
+});
+
+describe("shortNameFor", () => {
+  it("acronyms significant words, dropping stopwords", () => {
+    expect(shortNameFor("ANALOG AND DIGITAL COMMUNICATION")).toBe("ADC");
+    expect(shortNameFor("Design and Analysis of Algorithms")).toBe("DAA");
+    expect(shortNameFor("Computer Networks")).toBe("CN");
+  });
+
+  it("keeps a trailing Lab as a word instead of folding it into the acronym", () => {
+    expect(shortNameFor("ANALOG AND DIGITAL COMMUNICATION LAB")).toBe("ADC Lab");
+  });
+
+  it("leaves single-word (or single-significant-word) names unchanged", () => {
+    expect(shortNameFor("Mathematics")).toBe("Mathematics");
+    expect(shortNameFor("")).toBe("");
+    expect(shortNameFor(null)).toBe(null);
   });
 });

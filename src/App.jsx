@@ -468,6 +468,8 @@ function AuthenticatedApp({
                     element={
                       <TimetableScreen
                         registeredSubjects={subjectData[subjectSemestersData?.latest_semester?.registration_id]?.subjects ?? []}
+                        attendance={attendanceData[attendanceSemestersData?.latest_semester?.registration_id] ?? null}
+                        attendanceGoal={attendanceGoal}
                       />
                     }
                   />

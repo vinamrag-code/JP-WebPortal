@@ -114,3 +114,26 @@ export function unmatchedCodes(timetableCodes, attendance, codeAliases = {}) {
   const unusedAttendance = [...byCode.values()].filter((a) => !used.has(a.code));
   return { timetable: unmatchedTimetable, attendance: unusedAttendance };
 }
+
+const NAME_STOPWORDS = new Set(["and", "of", "the", "using", "for", "to", "in", "on", "a", "an", "&"]);
+
+/**
+ * A short label for a subject's full name, for tight spaces like the home-screen widget - an acronym of its
+ * significant words (e.g. "Analog And Digital Communication" -> "ADC"), with a trailing "Lab" kept as a word
+ * rather than folded into the acronym (e.g. "...Communication Lab" -> "ADC Lab"). Names too short to usefully
+ * abbreviate (a single significant word) are returned unchanged.
+ */
+export function shortNameFor(fullName) {
+  if (!fullName) return fullName;
+  const words = fullName.trim().split(/\s+/).filter(Boolean);
+  let core = words;
+  let suffix = "";
+  const lastWord = words[words.length - 1]?.toLowerCase();
+  if (words.length > 1 && (lastWord === "lab" || lastWord === "laboratory")) {
+    core = words.slice(0, -1);
+    suffix = " Lab";
+  }
+  const significant = core.filter((w) => !NAME_STOPWORDS.has(w.toLowerCase()));
+  if (significant.length <= 1) return fullName;
+  return significant.map((w) => w[0].toUpperCase()).join("") + suffix;
+}
