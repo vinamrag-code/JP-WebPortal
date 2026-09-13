@@ -119,6 +119,7 @@ export default function TimetableScreen({ registeredSubjects = [], attendance = 
           todayDayIndex={todayDayIndex()}
           onSaveClass={handleSaveClass}
           onDeleteClass={handleDeleteClass}
+          registeredSubjects={registeredSubjects}
         />
       </div>
     );

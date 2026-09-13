@@ -12,8 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { validateClass } from "@/lib/timetable/schedule";
-import { normaliseCode } from "@/lib/timetable/subjectMatching";
+import { normaliseCode, subjectNamesByCode } from "@/lib/timetable/subjectMatching";
 import { formatMinutes } from "@/lib/timetable/today";
+
+const CUSTOM_SUBJECT = "__custom__";
 
 const DAY_OPTIONS = [
   { value: "1", label: "Monday" },
@@ -42,7 +44,7 @@ const toMinutes = (hhmm) => {
  * Add/edit a single class. `initial` is a class from `schedule.classes`, or null to add a new one.
  * `existingAlias` pre-fills the "portal calls it" field when the timetable code already has a confirmed alias.
  */
-export default function TimetableClassEditor({ open, onOpenChange, initial, existingAlias, onSave, onDelete, defaultDayIndex = 1, defaultStartMinutes = 540 }) {
+export default function TimetableClassEditor({ open, onOpenChange, initial, existingAlias, onSave, onDelete, defaultDayIndex = 1, defaultStartMinutes = 540, registeredSubjects = [] }) {
   const [dayIndex, setDayIndex] = useState(String(initial?.dayIndex ?? defaultDayIndex));
   const [start, setStart] = useState(initial ? toHHMM(initial.startMinutes) : toHHMM(defaultStartMinutes));
   const [end, setEnd] = useState(initial ? toHHMM(initial.startMinutes + initial.durationMinutes) : toHHMM(defaultStartMinutes + 50));
@@ -53,6 +55,28 @@ export default function TimetableClassEditor({ open, onOpenChange, initial, exis
   const [teachers, setTeachers] = useState((initial?.teachers ?? []).join(", "));
   const [portalCode, setPortalCode] = useState(existingAlias ?? "");
   const [error, setError] = useState(null);
+
+  const subjectOptions = useMemo(
+    () => [...subjectNamesByCode(registeredSubjects).entries()]
+      .map(([subjCode, subjName]) => ({ code: subjCode, name: subjName }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    [registeredSubjects],
+  );
+  const initialMatch = subjectOptions.find((s) => s.code === normaliseCode(initial?.code ?? ""));
+  const [selectedSubject, setSelectedSubject] = useState(() => {
+    if (initial) return initialMatch ? initialMatch.code : CUSTOM_SUBJECT;
+    return subjectOptions.length ? "" : CUSTOM_SUBJECT;
+  });
+  const showManualFields = selectedSubject === CUSTOM_SUBJECT || (selectedSubject === "" && subjectOptions.length === 0);
+
+  const handleSubjectSelect = (value) => {
+    setSelectedSubject(value);
+    const match = subjectOptions.find((s) => s.code === value);
+    if (match) {
+      setCode(match.code);
+      setName(match.name);
+    }
+  };
 
   const preview = useMemo(() => {
     const s = toMinutes(start);
@@ -123,14 +147,32 @@ export default function TimetableClassEditor({ open, onOpenChange, initial, exis
           </div>
           {preview && <p className="text-xs text-muted-foreground">{preview}</p>}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="class-code">Subject code</Label>
-            <Input id="class-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="24B41EC311" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="class-name">Subject name</Label>
-            <Input id="class-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Operating System Concepts" />
-          </div>
+          {subjectOptions.length > 0 && (
+            <div className="space-y-1.5">
+              <Label>Subject</Label>
+              <Select value={selectedSubject} onValueChange={handleSubjectSelect}>
+                <SelectTrigger data-testid="subject-select"><SelectValue placeholder="Choose a subject…" /></SelectTrigger>
+                <SelectContent>
+                  {subjectOptions.map((s) => (
+                    <SelectItem key={s.code} value={s.code}>{s.name} ({s.code})</SelectItem>
+                  ))}
+                  <SelectItem value={CUSTOM_SUBJECT}>Custom / other subject…</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {showManualFields && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="class-code">Subject code</Label>
+                <Input id="class-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="24B41EC311" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="class-name">Subject name</Label>
+                <Input id="class-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Operating System Concepts" />
+              </div>
+            </>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="class-room">Room</Label>
@@ -181,4 +223,5 @@ TimetableClassEditor.propTypes = {
   onDelete: PropTypes.func,
   defaultDayIndex: PropTypes.number,
   defaultStartMinutes: PropTypes.number,
+  registeredSubjects: PropTypes.array,
 };

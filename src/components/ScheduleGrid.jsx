@@ -24,7 +24,7 @@ const TYPE_COLOR = { L: "hsl(var(--chart-2))", T: "hsl(var(--chart-3))", P: "hsl
  * `TimetableClassEditor` (already validated/tested) as the actual edit form - only the grid's visual shape
  * changes here.
  */
-export default function ScheduleGrid({ schedule, todayDayIndex, onSaveClass, onDeleteClass }) {
+export default function ScheduleGrid({ schedule, todayDayIndex, onSaveClass, onDeleteClass, registeredSubjects = [] }) {
   const [editing, setEditing] = useState(null); // { class: obj|null, dayIndex, startMinutes } | null = closed
 
   const classAt = (dayIndex, slotStart) =>
@@ -115,6 +115,7 @@ export default function ScheduleGrid({ schedule, todayDayIndex, onSaveClass, onD
           defaultDayIndex={editing.dayIndex}
           defaultStartMinutes={editing.startMinutes}
           existingAlias={editing.class ? schedule.codeAliases?.[editing.class.code] : undefined}
+          registeredSubjects={registeredSubjects}
           onSave={(cls, alias) => {
             onSaveClass(editing.class, cls, alias);
             setEditing(null);
@@ -131,4 +132,5 @@ ScheduleGrid.propTypes = {
   todayDayIndex: PropTypes.number,
   onSaveClass: PropTypes.func.isRequired,
   onDeleteClass: PropTypes.func.isRequired,
+  registeredSubjects: PropTypes.array,
 };

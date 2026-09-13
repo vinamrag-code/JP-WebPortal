@@ -77,4 +77,29 @@ describe("TimetableClassEditor", () => {
     render(<TimetableClassEditor open onOpenChange={() => {}} initial={existingClass} existingAlias="25B22EC311" onSave={() => {}} onDelete={() => {}} />);
     expect(screen.getByDisplayValue("25B22EC311")).toBeInTheDocument();
   });
+
+  const registeredSubjects = [
+    { subject_code: "24B41EC311", subject_desc: "Operating System Concepts", subject_component_code: "L", employee_name: "ANG" },
+    { subject_code: "18B11EC212", subject_desc: "Analog And Digital Communication", subject_component_code: "L", employee_name: "PAA" },
+  ];
+
+  it("shows a subject dropdown (not the manual fields) when registeredSubjects are given, for a brand-new class", () => {
+    render(<TimetableClassEditor open onOpenChange={() => {}} initial={null} onSave={() => {}} onDelete={null} registeredSubjects={registeredSubjects} />);
+    expect(screen.getByTestId("subject-select")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Subject code")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Subject name")).not.toBeInTheDocument();
+  });
+
+  it("pre-selects the matching registered subject when editing a class whose code is registered", () => {
+    render(<TimetableClassEditor open onOpenChange={() => {}} initial={existingClass} onSave={() => {}} onDelete={() => {}} registeredSubjects={registeredSubjects} />);
+    expect(screen.getByText("Operating System Concepts (24B41EC311)")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Subject code")).not.toBeInTheDocument();
+  });
+
+  it("falls back to the manual fields when editing a class whose code isn't in registeredSubjects", () => {
+    const unregisteredClass = { ...existingClass, code: "26B42EC313", name: "VLSI" };
+    render(<TimetableClassEditor open onOpenChange={() => {}} initial={unregisteredClass} onSave={() => {}} onDelete={() => {}} registeredSubjects={registeredSubjects} />);
+    expect(screen.getByDisplayValue("26B42EC313")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("VLSI")).toBeInTheDocument();
+  });
 });
