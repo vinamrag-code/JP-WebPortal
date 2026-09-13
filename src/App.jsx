@@ -14,6 +14,7 @@ import Header from "./components/Header";
 import Navbar from "./components/Navbar";
 import LoginScreen from "./uiv2/LoginScreen";
 import AppShell from "./uiv2/AppShell";
+import ProfileScreen from "./uiv2/ProfileScreen";
 import Attendance from "./components/Attendance";
 import Grades from "./components/Grades";
 import Exams from "./components/Exams";
@@ -410,11 +411,9 @@ function AuthenticatedApp({
                   <Route
                     path="/profile"
                     element={
-                      <Profile
-                        w={w}
+                      <ProfileScreen
                         profileData={profileData}
-                        setProfileData={setProfileData}
-                        semesterData={gradesSemesterData}
+                        setIsAuthenticated={setIsAuthenticated}
                       />
                     }
                   />
