@@ -4,5 +4,6 @@ import { cleanup } from "@testing-library/react";
 
 afterEach(() => {
   cleanup();
-  localStorage.clear();
+  // Tests that opt into the Node environment (e.g. pdf.js tests) have no localStorage.
+  if (typeof localStorage !== "undefined") localStorage.clear();
 });
