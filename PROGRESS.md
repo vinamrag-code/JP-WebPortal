@@ -38,14 +38,30 @@ Local work on top of [J2V-k/jportal-vhost](https://github.com/J2V-k/jportal-vhos
 | Phase | What | Status |
 |---|---|---|
 | J0 | Setup: local clone, install, baseline build, Vitest, this doc | ✅ Done |
-| J1 | **Timetable PDF parser** (pure JS, pdf.js): finds the grid, parses `L/T/P + batches + (code) - room / teacher`, filters by batch and electives | ✅ Done (awaiting owner confirmation) |
-| J2 | **Mobile app** (Capacitor): Android project builds an installable APK, and portal login/attendance work inside the app; iOS project scaffolded (build needs a Mac) | ⏭️ Next |
-| J3 | **Upload and review UI** on the Timetable page: upload PDF → pick batch and electives → preview (with parser warnings) → save into JPortal's timetable; richer editor (type, room, teacher) | ⏳ |
-| J4 | **Today section** component on the Timetable and Attendance pages: joins the schedule with attendance (code matching, aliases), switches to the next day after the last class, uses JPortal's attendance goal | ⏳ |
+| J1 | **Timetable PDF parser** (pure JS, pdf.js): finds the grid, parses `L/T/P + batches + (code) - room / teacher`, filters by batch and electives | ✅ Done |
+| J1.5 | **Shared logic**: schedule data model + persistence, portal/PDF subject-code matching (incl. code aliases), "Today" view logic, widget-snapshot JSON contract | ✅ Done |
+| J2 | **Upload and review UI** on the Timetable page: upload PDF → pick batch and electives → preview (with parser warnings) → save into JPortal's timetable; richer editor (type, room, teacher) | ⏭️ Next |
+| J3 | **Today section** component on the Timetable and Attendance pages, wired to the real app (`w`, `AuthenticatedApp`) using J1.5's `today.js` | ⏳ |
+| J4 | **Mobile app** (Capacitor): Android project builds an installable APK, and portal login/attendance work inside the app; iOS project scaffolded (build needs a Mac) | ⏳ |
 | J5 | **Home-screen widgets:** widget-snapshot bridge plugin; Android widget (port from `~/jiit-widget`), built and tested here; iOS WidgetKit extension written, built on a Mac | ⏳ |
 | J6 | **Background refresh** (Android WorkManager; iOS WidgetKit timeline within its limits) with a stale indicator; secure native credential handling (Keystore / Keychain), never plaintext | ⏳ |
 
-Order changed on 13 Sep 2026 at the owner's request ("create the app also"): the app moved up from J4 to J2.
+Order note: on 13 Sep the owner asked to move the app earlier ("create the app also"), then asked to pause that and
+"keep building the web app" while they prepare UI designs to share. J1.5 (schedule/matching/today logic) was pulled
+forward from J3/J4 because none of it depends on the Capacitor wrapper, so it was ready to build immediately. The
+mobile app (J4) resumes once there's a UI to wrap, or sooner if the owner asks.
+
+## Git remote (set up, push pending)
+- `origin` = `https://github.com/vinamrag-code/JP-WebPortal.git` (private, created, currently empty).
+- `upstream` = the original `J2V-k/jportal-vhost` (kept, so upstream updates can still be pulled).
+- Repo-local credential helper uses the `vinamrag-code` GitHub CLI token, independent of whichever account is
+  active elsewhere on this machine (work account `coreworks-vin` stays the default for everything else).
+- **Push of `main` failed once**: GitHub rejected it because `.github/workflows/deploy-docs.yml` needs the CLI
+  token's `workflow` OAuth scope, which `vinamrag-code`'s token doesn't have yet. Fix (either one): re-run
+  `gh auth refresh -h github.com -s workflow` for `vinamrag-code` and approve it in the browser, or drop the
+  `.github/workflows/` directory from what gets pushed. Paused at the owner's request before finishing this.
+- `feature/timetable-widget` has not been pushed either (blocked on the same thing, since it shares history with `main`).
+- Once resolved: `git push origin main && git push -u origin feature/timetable-widget`, then push after every future commit.
 
 ## J1: PDF parser (done)
 - **Code:** `src/lib/timetable/pdfTimetableParser.js`, pure JS. The caller passes the pdf.js module (Node tests use
@@ -87,7 +103,53 @@ Order changed on 13 Sep 2026 at the owner's request ("create the app also"): the
 - **Limits:**
   - Built for this JIIT grid format. Other campuses/years with a different layout need testing; send sample PDFs.
   - A 3-hour lab would be read as 1 hour (none on this sheet).
-  - The VLSI portal code alias (`25B22EC311`) and course titles are not handled by the parser; that is J3/J4 matching.
+  - The VLSI portal code alias (`25B22EC311`) and course titles are not handled by the parser; that is handled one
+    layer up, in `subjectMatching.js` (see J1.5).
+
+## J1.5: Schedule model, subject matching, Today/widget-snapshot logic (done)
+
+Built ahead of schedule because none of it needs the Capacitor wrapper. All pure JS in `src/lib/timetable/`, all with
+Vitest tests (34 new tests, 42 total across the phase). Not yet wired into any UI — that's J2 (upload/editor) and J3
+(Today section).
+
+- **`subjectMatching.js`**: reconciles three sources of subject codes that don't always agree — the PDF, the portal's
+  registered-subjects list (`w.get_registered_subjects_and_faculties`), and attendance rows (whose `subjectcode` field
+  is really `"NAME(CODE)"`).
+  - `extractSubjectCode` / `extractSubjectName` split `"NAME(CODE)"`.
+  - `subjectNamesByCode` builds a code→name map from registered subjects (jsjiit `RegisteredSubject`).
+  - `suggestElectives` filters the PDF's elective codes down to ones the student is actually registered for — the
+    "auto-detect my electives" step for J2's upload flow.
+  - `rankBatches` scores each timetable batch by how many of its subject codes match the student's registered
+    subjects, so the upload UI can suggest "you're probably E1" instead of asking the student to know their own batch
+    code cold.
+  - `attendanceByCode` indexes attendance rows by portal code with numeric percentages (tolerates strings like
+    `"80.0"`, matching what Phase 4 of `~/jiit-widget` found the portal actually returns).
+  - `attendanceCodeFor` / `unmatchedCodes` apply and surface **confirmed** code aliases (e.g. PDF `26B42EC313` → portal
+    `25B22EC311` for VLSI, the exact mismatch found in `~/jiit-widget` Phase 5). Aliases are never guessed — J2's UI
+    will ask the student to confirm one when `unmatchedCodes` reports a leftover on each side.
+- **`schedule.js`**: the student's personal schedule — `buildSchedule` turns parsed PDF entries into it via
+  `selectEntriesForStudent` (batch + chosen electives), giving each class a stable `id` and a name where the portal's
+  registered-subjects list has one. `upsertClass` / `removeClass` / `setCodeAlias` are pure functions (return a new
+  schedule) with validation (`validateClass`) covering day range, valid L/T/P type, and start-before-end-before-midnight.
+  `toTimetableEvents` converts to the `{summary, location, start, end}` shape JPortal's **existing** `Timetable.jsx`
+  weekly grid already renders, so J2 doesn't need a new grid UI — the current one just needs data.
+- **`timetableStore.js`**: localStorage persistence (`SCHEDULE_STORAGE_KEY`), validated on load
+  (`isValidSchedule`, wrong-version or corrupt data reported as `"unreadable"` rather than crashing or silently
+  resetting), and keeps JPortal's `timetable_modified_events` cache key in sync on every save so the existing weekly
+  grid picks it up for free.
+- **`today.js`**: the "Today" view — which day to show (today until its last class ends, then the next day with
+  classes; Saturday evening and Sunday both lead to Monday), attendance joined onto each row via `subjectMatching`,
+  and a `belowGoal` flag against a configurable attendance goal (JPortal already has `attendanceGoal` in
+  `localStorage`/`App.jsx`; J3 will pass it in instead of the 75% default). This is a JS port of `ScheduleBuilder.kt`
+  from `~/jiit-widget`, so the two apps agree on what "today's schedule" means.
+- **`widgetSnapshot.js`**: the versioned JSON contract the web app will eventually write for the native widgets to
+  read (J5). Deliberately carries the **whole week**, not just today, because a widget renders at times the app isn't
+  running and has to pick the current day itself; documented inline with the exact JSON shape both Kotlin and Swift
+  will decode.
+- **Tests**: `subjectMatching.test.js` (6), `schedule.test.js` (9, including a full add/edit/move/delete/alias
+  round-trip and `toTimetableEvents` date-math checks), `today.test.js` (7, covering the day-rollover matrix and a
+  round-trip through `buildWidgetSnapshot` confirming it's plain-JSON-safe via `JSON.parse(JSON.stringify(x))`).
+- **Verified**: full suite green (42/42), `eslint` clean on every new file, production build (`vite build`) unaffected.
 
 ## J0: Setup (done)
 - Cloned to `~/jportal`, branch `feature/timetable-widget`, from upstream commit `351f41a` (v2.260815).
