@@ -225,9 +225,8 @@ timetable upload, editor and Today section — runs as an installable APK, not j
 - **iOS**: not started. `npx cap add ios` needs Xcode (macOS-only); the Node/JS side (web build, Capacitor config)
   is already platform-neutral and ready for it whenever a Mac is available.
 
-## J4b: New UI design import — increment 1 done (colors + nav), screens not started
+## J4b: Increment 1 (colors + nav visibility) — done
 
-### Increment 1: color system + Timetable nav visibility (done)
 - **`src/lib/nocturneTheme.js`**: the design's `colors()` dark/light palettes ported into JPortal's existing
   theme-preset schema (the same `theme.styles.{light,dark}` shape as `public/theme-presets.json`'s presets), with
   every translucent `rgba(...)` token (the design's `textMuted`/`divider`) pre-flattened to solid hex composited
@@ -246,11 +245,6 @@ timetable upload, editor and Today section — runs as an installable APK, not j
 - **Timetable tab always shown**: `getShowTimetableInNavbar()` (`cache.js`) now defaults to `true` for anyone who
   has never touched the setting (it was `false`), since Timetable does real work now. An explicit prior choice
   (on or off) is still respected exactly.
-- **Deliberately not changed**: the design's buttons are outline/ghost style (transparent fill, accent
-  border+text — see `styles.css`'s `.btn-primary`); JPortal's shared `Button` component defaults to solid-fill.
-  Matching that exactly means restyling a component used by every button in the whole app, which needed visual
-  verification I can't do here (no display on this dev machine) — left as an explicit follow-up, not attempted
-  blind. Same reasoning for keeping `lucide-react` icons rather than switching to the design's Phosphor icons.
 - **Tests (7 new)**: `nocturneTheme.test.js` — every color value is solid hex not rgba, dark/light have matching
   keys, `applyTheme()` actually sets the right DOM class and CSS variables (asserted structurally — an HSL-triplet
   shape and dark-vs-light lightness relationship — rather than a hand-computed exact HSL string, since
@@ -258,14 +252,82 @@ timetable upload, editor and Today section — runs as an installable APK, not j
   `getPresetById`/`getPresetsByCategory` even when `fetch` is stubbed to reject (offline-safe). Plus
   `cache.showTimetable.test.js` (2 tests) for the new default. Mutation-checked. 67/67 tests pass, `vite build`
   succeeds, and a rebuilt Android APK (`jportal-v1.1-debug.apk`) was scanned clean and sent to the owner.
-- **Not verified visually**: no display on this dev machine — checked via `applyTheme`'s actual DOM/CSS-variable
-  output in tests and by grepping the built JS bundle for the accent color, not by looking at a rendered screen.
-  The owner's phone is the real check.
+- **Not verified visually at the time**: no display on this dev machine yet had a workaround — checked via
+  `applyTheme`'s actual DOM/CSS-variable output in tests and by grepping the built JS bundle for the accent color,
+  not by looking at a rendered screen. See below for how that changed for increment 2.
 
-### Increment 2+ (not started): per-screen layouts
-The design's actual page layouts (ring-chart Attendance cards, day/week Timetable views, the Exams list with seat
-numbers, Grades charts, Subjects component badges, Profile) have not been touched — only the color system and one
-nav-visibility default changed so far. Read on for what those screens contain and how they relate to J1-J3.
+## J4b pivot (13 Sep, later the same day): recreate the actual screens, not just recolor
+
+After increment 1 (colors + nav default) shipped, the owner clarified the real ask: **recreate the design's
+actual screens** (login, bottom-nav shell, Attendance, Timetable, Exams, Grades, Subjects, Profile) using
+Phosphor icons as the design does, with JPortal's real logic underneath — not JPortal's existing page
+components restyled. New screens live in `src/uiv2/`, built one at a time, wired into the existing
+`App.jsx`/`AuthenticatedApp` data-fetching (unchanged) rather than a parallel app.
+
+**A dev-server + headless-browser workflow was set up to make this possible without a display**: `vite dev
+--host` bound to `0.0.0.0` (reachable from the owner's phone on the same LAN, or `localhost` for a resized
+desktop browser), plus a cached Playwright Chromium (`~/.cache/ms-playwright/chromium-1234`) driven via
+`playwright-core` (installed ad hoc in the scratchpad, not added to the project) to actually render pages at
+a 393×852 mobile viewport and screenshot them. This is the first point in J4b where visual results were
+verified by *looking at them*, not just inferred from tests and a build — every screen from here on is
+screenshot-checked before being called done, including logging in with the real portal account to see real
+data render (session saved via Playwright's `storageState` between checks, not re-entered each time).
+
+### Login screen — done (`src/uiv2/LoginScreen.jsx`)
+Matches the design's layout (compass logo, enrollment/password fields with Phosphor icons, password
+visibility toggle, loading spinner, error banner, "OR CONTINUE WITHOUT LOGIN" + Offline Mode). Same
+`{w, onLoginSuccess}` contract as the legacy `Login.jsx` it replaces in `LoginWrapper`, so it reuses the
+real `w.student_login()` call, `setCredentials` persistence, `LoginError` handling, and the existing
+`ArtificialWebPortal` offline fallback — only the presentation is new.
+
+**Found and fixed a real cross-cutting CSS bug** while getting this screen right, worth knowing before
+building the rest: **Tailwind v3's `@layer` directive only resolves in the file holding the matching
+`@tailwind components` declaration** (`index.css`). A separately-imported stylesheet using `@layer
+components` either fails the build outright, or — if left unlayered — permanently loses to Tailwind's own
+utilities regardless of specificity or source order (CSS cascade layers give *any* layered rule priority
+over unlayered CSS). This is exactly what caused the login screen's icon and placeholder text to overlap on
+first pass. Fix: the design's `.wp-*` component classes (input, button, icon-button, segmented control,
+card, chip, nav item, select) now live directly in `index.css` inside `@layer components`, not a separate
+`src/uiv2/*.css` file. **Every future uiv2 screen can safely mix `.wp-*` classes with Tailwind utilities on
+the same element** because of this fix — worth remembering if a new `.wp-*` class is ever added elsewhere.
+
+Verified end-to-end against the live proxy backend (`https://render-proxy-gfn4.onrender.com/...`, see
+`src/lib/api.js` — corrects an earlier, wrong note in this doc that `api.js` was empty and the app used no
+proxy; it does, and that's *why* CORS isn't the issue it would be calling the portal directly from a
+browser): typing, the password toggle, the loading state, and a real wrong-password error round-trip all
+render correctly, and a real login with the owner's account succeeds and reaches the app shell below.
+
+### App shell (top bar + bottom nav) — done (`src/uiv2/AppShell.jsx`)
+Replaces the legacy `Navbar` (sidebar/bottom-bar) + `Header` chrome for authenticated routes with the
+design's top bar (logo or back button, page title, theme toggle, profile icon) and 5-tab bottom nav
+(Attendance/Grades/Timetable/Exams/Subjects), wired around the existing `<Routes>` in `App.jsx` — no route,
+page component, or data-fetching logic touched.
+
+Screenshot-verified with a real logged-in session: the shell renders correctly, and — confirming the same
+"free reskin" effect seen in J1–J3 — the **untouched** `Attendance.jsx` page picked up the full Nocturne
+theme automatically, since it already used the shared shadcn `Card`/`Badge` components. A first check using
+a Playwright `fullPage` screenshot showed the fixed bottom nav floating in the middle of the page; re-checked
+with a normal viewport-sized screenshot and confirmed this was a `position:fixed` + `fullPage` screenshot
+artifact, not a real overlap bug.
+
+**Known gap, not an oversight**: logout was only reachable via the old `Header`, which authenticated routes
+no longer render — **there is currently no way to log out** until the Profile screen (next) adds the
+design's own logout button. `setIsAuthenticated`/`messMenuOpen`/`onMessMenuChange` are kept flowing into
+`AuthenticatedApp` for exactly that reason, unused for now (hence a jump in `App.jsx`'s pre-existing
+no-props-validation lint count, 13 → 16 — same pattern, not a new category of problem).
+
+### Not started yet
+Attendance's actual card layout (ring charts, day-to-day calendar), Timetable (day/week toggle — the real
+schedule/editor from J1–J3 needs a visual pass, not new logic), Exams, Grades (charts), Subjects, and
+Profile (including restoring logout — see the App shell section above). Continuing screen by screen, same
+pattern: build against real data, screenshot-verify, test/lint/build, commit.
+
+Deliberately not changed so far: the design's buttons are outline/ghost style (transparent fill, accent
+border+text — see the canvas's own `.btn-primary`); JPortal's shared `Button` component defaults to
+solid-fill. Matching that exactly means restyling a component used by every button in the whole app — worth
+doing once more screens are done and it can be checked broadly, not piecemeal. Icons use Phosphor (matching
+the design) only within `src/uiv2/`; the untouched legacy pages still under J1–J3 (`ScheduleGrid`,
+`TimetableClassEditor`, etc.) keep `lucide-react`.
 
 On 13 Sep the owner shared a Claude Design canvas — `claude.ai/design/p/c9761a04-842d-42d7-bc94-6c272e0ca578`,
 project "# JIIT Campus App Design", file `JP WebPortal.dc.html` — and asked to implement it and ship an APK.
