@@ -182,7 +182,8 @@ export function applyTheme(theme, currentMode = null) {
 
 // --- Data Fetching & Storage ---
 
-import { getJPTheme, setJPTheme, getThemePresetsCache, setThemePresetsCache } from '@/components/scripts/cache' 
+import { getJPTheme, setJPTheme, getThemePresetsCache, setThemePresetsCache } from '@/components/scripts/cache'
+import { NOCTURNE_PRESET } from '@/lib/nocturneTheme'
 
 export function loadSavedTheme() {
   try {
@@ -215,24 +216,31 @@ async function loadThemePresetsFromFile() {
   }
 }
 
+// Bundled in the app itself (not fetched from the CDN preset list) so it's always available offline and on
+// first run, before any network fetch completes. See src/lib/nocturneTheme.js for provenance.
+const BUNDLED_PRESETS = [NOCTURNE_PRESET]
+
 export async function getAllThemePresets() {
   const data = await loadThemePresetsFromFile()
-  if (!data || !data.presets) return {}
   const allPresets = {}
-  Object.values(data.presets).forEach(categoryPresets => {
-    if (Array.isArray(categoryPresets)) {
-      categoryPresets.forEach(preset => {
-        allPresets[preset.id] = preset
-      })
-    }
-  })
+  BUNDLED_PRESETS.forEach(preset => { allPresets[preset.id] = preset })
+  if (data && data.presets) {
+    Object.values(data.presets).forEach(categoryPresets => {
+      if (Array.isArray(categoryPresets)) {
+        categoryPresets.forEach(preset => {
+          allPresets[preset.id] = preset
+        })
+      }
+    })
+  }
   return allPresets
 }
 
 export async function getPresetsByCategory(category) {
   const data = await loadThemePresetsFromFile()
-  if (!data || !data.presets || !data.presets[category]) return []
-  return data.presets[category]
+  const fetched = (data && data.presets && data.presets[category]) || []
+  const bundled = BUNDLED_PRESETS.filter(preset => preset.category === category)
+  return [...bundled, ...fetched]
 }
 
 export async function getThemeCategories() {
