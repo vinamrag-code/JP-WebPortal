@@ -10,7 +10,7 @@ import MoocStatus from "./MoocStatus"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Empty } from "@/components/ui/empty"
-import { Loader2, Calendar, Eye, ArrowLeft, BookOpen, ListChecks} from "lucide-react"
+import { Loader2, Calendar, Eye, ArrowLeft} from "lucide-react"
 import { getRegisteredSubjectsFromCache, saveRegisteredSubjectsToCache, getSubjectChoicesFromCache, saveSubjectChoicesToCache } from '@/components/scripts/cache'
 import { getUsername } from '@/components/scripts/cache' 
 
@@ -357,9 +357,6 @@ export default function Subjects({
   const currentSubjects = selectedSem && subjectData?.[selectedSem.registration_id]
   const currentChoices = selectedSem && subjectChoices?.[selectedSem.registration_id]
   const currentSubjectsError = currentSubjects?.error
-  const fallbackSemesterList = semestersData?.semesters || []
-  const moocHasFallback = moocSemesters.length === 0 && fallbackSemesterList.length > 0
-  const addDropHasFallback = addDropSemesters.length === 0 && fallbackSemesterList.length > 0
 
   const getNextSemester = () => {
     if (!semestersData?.semesters || !selectedSem) return null
@@ -450,10 +447,7 @@ export default function Subjects({
     }
 
     return (
-      <button
-        onClick={handleClick}
-        className="inline-flex items-center gap-3 px-6 py-2 bg-primary text-primary-foreground border border-primary/20 rounded-lg hover:bg-primary/90 transition-all duration-200 text-lg font-medium shadow-lg"
-      >
+      <button onClick={handleClick} className="wp-btn" style={{ fontSize: 15 }}>
         <Calendar size={20} />
         Create personalized Timetable
       </button>
@@ -491,35 +485,28 @@ export default function Subjects({
         </motion.div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="px-3 max-w-[1440px] mx-auto">
-          <TabsList className="mt-4 grid w-full grid-cols-3 gap-2 bg-card p-1.5 sm:gap-3">
-            <TabsTrigger
-              value="registered"
-              className="cursor-pointer text-muted-foreground bg-transparent data-[state=active]:bg-primary/10 data-[state=active]:text-foreground transition-colors flex items-center justify-center gap-1.5 px-2 py-2 text-[11px] sm:text-sm sm:gap-2"
-            >
-              <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="truncate">Registered</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="choices"
-              className="cursor-pointer text-muted-foreground bg-transparent data-[state=active]:bg-primary/10 data-[state=active]:text-foreground transition-colors flex items-center justify-center gap-1.5 px-2 py-2 text-[11px] sm:text-sm sm:gap-2"
-            >
-              <ListChecks className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="truncate">Choices</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="status"
-              className="cursor-pointer text-muted-foreground bg-transparent data-[state=active]:bg-primary/10 data-[state=active]:text-foreground transition-colors flex items-center justify-center gap-1.5 px-2 py-2 text-[11px] sm:text-sm sm:gap-2"
-            >
-              <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="truncate">MOOC / Add</span>
-            </TabsTrigger>
+          <TabsList asChild>
+            <div className="wp-seg w-full mt-4">
+              {[
+                { id: "registered", icon: "ph-book-open", label: "Registered" },
+                { id: "choices", icon: "ph-list-checks", label: "Choices" },
+                { id: "status", icon: "ph-graduation-cap", label: "MOOC / Add" },
+              ].map((tab) => (
+                <TabsTrigger key={tab.id} value={tab.id} asChild>
+                  <button className={`wp-seg-opt flex-1 flex items-center justify-center gap-1.5 ${activeTab === tab.id ? "active" : ""}`}>
+                    <i className={`ph ${tab.icon}`} style={{ fontSize: 14 }} />
+                    <span className="truncate">{tab.label}</span>
+                  </button>
+                </TabsTrigger>
+              ))}
+            </div>
           </TabsList>
 
           <TabsContent value="registered" className="mt-4">
             {!subjectsLoading && currentSubjects && (
               <div className="space-y-4 mb-6">
-                <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-card p-4 rounded-lg border border-border shadow-sm">
-                  <div className="flex items-center gap-2 p-1 bg-muted/30 rounded-lg border border-border w-full md:w-auto overflow-x-auto">
+                <div className="wp-card flex-row flex-wrap gap-3 items-center justify-between">
+                  <div className="wp-seg w-full md:w-auto overflow-x-auto">
                     {[
                       { id: 'L', label: 'Lectures' },
                       { id: 'T', label: 'Tutorials' },
@@ -528,21 +515,16 @@ export default function Subjects({
                       <button
                         key={comp.id}
                         onClick={() => setComponentFilters(prev => ({ ...prev, [comp.id]: !prev[comp.id] }))}
-                        className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap ${
-                          componentFilters[comp.id] 
-                            ? "bg-primary text-primary-foreground shadow-sm" 
-                            : "text-muted-foreground hover:bg-muted"
-                        }`}
+                        className={`wp-seg-opt flex-1 whitespace-nowrap ${componentFilters[comp.id] ? "active" : ""}`}
                       >
                         {comp.label}
                       </button>
                     ))}
                   </div>
 
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/5 text-primary border border-primary/20 rounded-full text-xs font-bold">
-                    <BookOpen className="w-3.5 h-3.5" />
-                    Total Credits: {currentSubjects?.total_credits || 0}
-                  </div>
+                  <span className="wp-chip" style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>
+                    <i className="ph ph-book-open" style={{ fontSize: 13 }} /> Total Credits: {currentSubjects?.total_credits || 0}
+                  </span>
                 </div>
               </div>
             )}
@@ -556,9 +538,9 @@ export default function Subjects({
               </div>
             ) : currentSubjectsError ? (
               <div className="flex items-center justify-center py-8">
-                <div className="text-center bg-card rounded-lg p-6 max-w-md border border-border">
-                  <p className="text-xl text-destructive mb-2">Subjects Unavailable</p>
-                  <p className="text-muted-foreground">{currentSubjectsError}</p>
+                <div className="wp-card text-center max-w-md">
+                  <p className="text-xl mb-2" style={{ color: "hsl(var(--destructive))" }}>Subjects Unavailable</p>
+                  <p style={{ color: "hsl(var(--muted-foreground))" }}>{currentSubjectsError}</p>
                 </div>
               </div>
             ) : filteredSubjectsList.length === 0 ? (
@@ -597,17 +579,15 @@ export default function Subjects({
           <TabsContent value="choices" className="mt-4">
             <div className="flex justify-center mb-4">
               {nextSemChoices ? (
-                <button
-                  onClick={handleBackToCurrent}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-card text-foreground border border-border rounded-lg hover:bg-muted/5 transition-colors text-sm font-medium"
-                >
+                <button onClick={handleBackToCurrent} className="wp-btn" style={{ minHeight: 38, fontSize: 13, borderColor: "hsl(var(--border))", color: "hsl(var(--foreground))" }}>
                   <ArrowLeft size={14} /> Back to {selectedSem?.registration_code}
                 </button>
               ) : (
                 <button
                   onClick={handleViewNextSemElectives}
                   disabled={nextSemChoicesLoading || !getNextSemester()}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-card text-foreground border border-border rounded-lg hover:bg-muted/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                  className="wp-btn disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ minHeight: 38, fontSize: 13, borderColor: "hsl(var(--border))", color: "hsl(var(--foreground))" }}
                 >
                   {nextSemChoicesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
                   {nextSemChoicesLoading ? 'Loading...' : `View ${getNextSemester()?.registration_code || ''} Electives`}
@@ -622,55 +602,43 @@ export default function Subjects({
           </TabsContent>
 
           <TabsContent value="status" className="mt-4 space-y-4">
-            <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="text-base md:text-lg font-bold">MOOC Status</h3>
-                <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">{moocSemesters.length}</span>
+            <div className="wp-card gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-base font-semibold">MOOC Status</h3>
+                <span className="wp-chip" style={{ background: "hsl(var(--accent))", color: "hsl(var(--accent-foreground))" }}>{moocSemesters.length}</span>
               </div>
 
               {statusLoading.mooc ? (
-                <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <div className="flex items-center justify-center py-12" style={{ color: "hsl(var(--muted-foreground))" }}>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading MOOC status...
                 </div>
               ) : moocStatusDetail ? (
                 <MoocStatus moocStatus={moocStatusDetail} />
               ) : moocSemesters.length === 0 ? (
-                moocHasFallback ? (
-                  <div className="rounded-lg border border-dashed border-border p-6 text-center text-muted-foreground">
-                    unavailable
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-dashed border-border p-6 text-center text-muted-foreground">
-                    unavailable
-                  </div>
-                )
+                <div className="rounded-lg p-6 text-center" style={{ border: "1px dashed hsl(var(--border))", color: "hsl(var(--muted-foreground))" }}>
+                  unavailable
+                </div>
               ) : (
                 <MoocStatus moocStatus={moocSemesters[0]} />
               )}
             </div>
 
-            <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="text-base md:text-lg font-bold">Add / Drop Status</h3>
-                <span className="rounded-full border border-secondary/20 bg-secondary/10 px-2 py-1 text-xs font-semibold text-secondary">{addDropSemesters.length}</span>
+            <div className="wp-card gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-base font-semibold">Add / Drop Status</h3>
+                <span className="wp-chip" style={{ background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))" }}>{addDropSemesters.length}</span>
               </div>
 
               {statusLoading.adddrop ? (
-                <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <div className="flex items-center justify-center py-12" style={{ color: "hsl(var(--muted-foreground))" }}>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading add / drop status...
                 </div>
               ) : addDropStatusDetail ? (
                 <AddDropStatus addDropStatus={addDropStatusDetail} />
               ) : addDropSemesters.length === 0 ? (
-                addDropHasFallback ? (
-                  <div className="rounded-lg border border-dashed border-border p-6 text-center text-muted-foreground">
-                    unavailable
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-dashed border-border p-6 text-center text-muted-foreground">
-                    unavailable
-                  </div>
-                )
+                <div className="rounded-lg p-6 text-center" style={{ border: "1px dashed hsl(var(--border))", color: "hsl(var(--muted-foreground))" }}>
+                  unavailable
+                </div>
               ) : (
                 <AddDropStatus addDropStatus={addDropSemesters[0]} />
               )}
