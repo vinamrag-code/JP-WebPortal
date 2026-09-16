@@ -6,25 +6,28 @@ import {
   Navigate,
   useNavigate,
   useLocation,
+  useSearchParams,
 } from "react-router-dom";
 import { CSSTransition, TransitionGroup } from "react-transition-group";
 import "./styles/transitions.css";
 import "./styles/layout.css";
 import Header from "./components/Header";
 import Navbar from "./components/Navbar";
-import Login from "./components/Login";
+import LoginScreen from "./uiv2/LoginScreen";
+import AppShell from "./uiv2/AppShell";
+import ProfileScreen from "./uiv2/ProfileScreen";
+import TimetableScreen from "./uiv2/TimetableScreen";
 import Attendance from "./components/Attendance";
 import Grades from "./components/Grades";
 import Exams from "./components/Exams";
 import Subjects from "./components/Subjects";
 import Profile from "./components/Profile";
-import Timetable from "./components/Timetable";
 import Fee from "./components/Fee";
 import AcademicCalendar from "./components/AcademicCalendar";
 import { Calendar as CalendarIcon } from "lucide-react";
 import "./App.css";
 import { ThemeProvider } from "./context/ThemeContext";
-import { getMessMenuOpen as getMessMenuOpenFromCache, setMessMenuOpen as persistMessMenuOpen, getAttendanceGoal as getAttendanceGoalFromCache, setAttendanceGoal as persistAttendanceGoal, getUsername, getPassword, hasAnyPortalData, getDefaultTab, getExamStartDate, getExamEndDate, getSwipeEnabled as getSwipeEnabledFromCache } from '@/components/scripts/cache' 
+import { getMessMenuOpen as getMessMenuOpenFromCache, setMessMenuOpen as persistMessMenuOpen, getAttendanceGoal as getAttendanceGoalFromCache, setAttendanceGoal as persistAttendanceGoal, getUsername, hasAnyPortalData, getDefaultTab, getExamStartDate, getExamEndDate, getSwipeEnabled as getSwipeEnabledFromCache } from '@/components/scripts/cache'
 import { Loader2 } from "lucide-react";
 import MessMenu from "./components/MessMenu";
 import InstallPWA from "./components/InstallPWA";
@@ -32,14 +35,12 @@ import { UtensilsCrossed } from "lucide-react";
 import { HelmetProvider } from "react-helmet-async";
 import { Toaster } from "@/components/ui/sonner";
 
-import {
-  WebPortal,
-  LoginError,
-} from "https://cdn.jsdelivr.net/npm/jsjiit@0.0.28/dist/jsjiit.esm.js";
+import { WebPortal } from "https://cdn.jsdelivr.net/npm/jsjiit@0.0.28/dist/jsjiit.esm.js";
 import { serialize_payload } from "@/lib/jiitCrypto";
 import { proxy_url } from "@/lib/api";
+import { restoreSession, refreshSession, importSession } from "@/lib/googleAuth";
 import { ArtificialWebPortal } from "./components/scripts/artificialW";
-import { saveProfileDataToCache } from '@/components/scripts/cache'
+import { saveProfileDataToCache, getRegisteredSubjectsFromCache, saveRegisteredSubjectsToCache } from '@/components/scripts/cache'
 import Feedback from "./components/Feedback";
 import CGPATargetCalculator from "./components/CGPATargetCalculator";
 
@@ -88,6 +89,42 @@ function AuthenticatedApp({
     };
     fetchProfileData();
   }, [w, profileData]);
+
+  // Prefetches the latest semester's registered subjects in the background so subject names (not just
+  // codes) are available on the Timetable screen even if the user never opens the Subjects page this
+  // session. Subjects.jsx shares this same `subjectData`/`subjectSemestersData` state and skips its own
+  // fetch for a semester that's already populated here.
+  const subjectPrefetchStarted = useRef(false);
+  useEffect(() => {
+    if (subjectPrefetchStarted.current) return undefined;
+    subjectPrefetchStarted.current = true;
+    let active = true;
+    const prefetchSubjects = async () => {
+      try {
+        const registeredSems = await w.get_registered_semesters();
+        const semestersList = Array.isArray(registeredSems) ? registeredSems : [];
+        const latest = semestersList[0] || null;
+        if (!active) return;
+        setSubjectSemestersData({ semesters: semestersList, latest_semester: latest });
+        if (!latest) return;
+
+        const username = w.session?.enrollmentno || w.username || getUsername() || 'user';
+        try {
+          const cached = await getRegisteredSubjectsFromCache(username, latest);
+          if (cached && active) setSubjectData((prev) => ({ ...prev, [latest.registration_id]: cached }));
+        } catch { /* ignore cache miss */ }
+
+        const data = await w.get_registered_subjects_and_faculties(latest);
+        if (!active) return;
+        setSubjectData((prev) => ({ ...prev, [latest.registration_id]: data }));
+        try { await saveRegisteredSubjectsToCache(data, username, latest); } catch { /* ignore cache write failure */ }
+      } catch (error) {
+        console.error("Failed to prefetch registered subjects:", error);
+      }
+    };
+    prefetchSubjects();
+    return () => { active = false; };
+  }, [w]);
 
   const [activeGradesTab, setActiveGradesTab] = useState("overview");
   const [gradeCardSemesters, setGradeCardSemesters] = useState([]);
@@ -200,29 +237,12 @@ function AuthenticatedApp({
   };
 
   return (
-    <div className="relative">
-      <Navbar
-        w={w}
-        messMenuOpen={messMenuOpen}
-        onMessMenuChange={onMessMenuChange}
-      />
-      <div
-        className="min-h-screen flex flex-col"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEndWithTransition}
-      >
-        <div className="flex-none z-30 bg-background md:ml-64">
-          <Header
-            setIsAuthenticated={setIsAuthenticated}
-            messMenuOpen={messMenuOpen}
-            onMessMenuChange={onMessMenuChange}
-            attendanceGoal={attendanceGoal}
-            setAttendanceGoal={setAttendanceGoal}
-            w={w}
-          />
-        </div>
-        <div className="flex-1 overflow-y-auto md:ml-64">
+    <div
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEndWithTransition}
+    >
+      <AppShell>
           <TransitionGroup component={null}>
             <CSSTransition
               key={location.pathname}
@@ -426,11 +446,9 @@ function AuthenticatedApp({
                   <Route
                     path="/profile"
                     element={
-                      <Profile
-                        w={w}
+                      <ProfileScreen
                         profileData={profileData}
-                        setProfileData={setProfileData}
-                        semesterData={gradesSemesterData}
+                        setIsAuthenticated={setIsAuthenticated}
                       />
                     }
                   />
@@ -447,12 +465,10 @@ function AuthenticatedApp({
                   <Route
                     path="/timetable"
                     element={
-                      <Timetable
-                        w={w}
-                        profileData={profileData}
-                        subjectData={subjectData}
-                        subjectSemestersData={subjectSemestersData}
-                        selectedSubjectsSem={selectedSubjectsSem}
+                      <TimetableScreen
+                        registeredSubjects={subjectData[subjectSemestersData?.latest_semester?.registration_id]?.subjects ?? []}
+                        attendance={attendanceData[attendanceSemestersData?.latest_semester?.registration_id] ?? null}
+                        attendanceGoal={attendanceGoal}
                       />
                     }
                   />
@@ -465,16 +481,17 @@ function AuthenticatedApp({
               </div>
             </CSSTransition>
           </TransitionGroup>
-        </div>
-      </div>
+      </AppShell>
     </div>
   );
 }
 
-function LoginWrapper({ onLoginSuccess, w }) {
+/** Shared by `LoginWrapper` and `ImportSessionWrapper`: sets the authenticated portal, then routes to the
+ * user's default tab (or the exam schedule during an active exam window). */
+function useLoginSuccessRedirect(onLoginSuccess, w) {
   const navigate = useNavigate();
 
-  const handleLoginSuccess = (webPortal = null) => {
+  return (webPortal = null) => {
     const portal = webPortal || w;
     onLoginSuccess(portal);
     setTimeout(() => {
@@ -534,8 +551,50 @@ function LoginWrapper({ onLoginSuccess, w }) {
       }, 2000);
     }, 100);
   };
+}
 
-  return <Login onLoginSuccess={handleLoginSuccess} w={w} />;
+function LoginWrapper({ onLoginSuccess, w }) {
+  const handleLoginSuccess = useLoginSuccessRedirect(onLoginSuccess, w);
+  return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+}
+
+/**
+ * Route the sign-in bookmarklet redirects to (`#/import-session?token=...`, see `@/lib/googleAuth`) -
+ * builds the session from the captured params and continues straight into the app, same as a normal login.
+ */
+function ImportSessionWrapper({ onLoginSuccess, w }) {
+  const [searchParams] = useSearchParams();
+  const [error, setError] = useState("");
+  const handleLoginSuccess = useLoginSuccessRedirect(onLoginSuccess, w);
+  const attempted = useRef(false);
+
+  useEffect(() => {
+    if (attempted.current) return;
+    attempted.current = true;
+    try {
+      importSession(w, searchParams);
+      handleLoginSuccess(w);
+    } catch (err) {
+      setError(err.message || "Couldn't import that sign-in link.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background text-foreground px-6 text-center">
+      {error ? (
+        <>
+          <p className="text-destructive font-medium">{error}</p>
+          <a href="#/" className="text-primary underline text-sm">Back to sign in</a>
+        </>
+      ) : (
+        <>
+          <Loader2 className="w-8 h-8 animate-spin" />
+          <p className="text-sm">Signing you in…</p>
+        </>
+      )}
+    </div>
+  );
 }
 
 function App() {
@@ -610,48 +669,32 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const username = getUsername();
-    const password = getPassword();
-
+    // Students no longer log in with a password (the portal switched to Google Sign-In, 16 Sep 2026 - see
+    // PROGRESS.md), so there's nothing to auto-login *with* anymore - only a previously saved session to
+    // try to resume. restoreSession() rebuilds a working session from the last Google sign-in without
+    // prompting Google again; its own get_headers() proactively refreshes near expiry. If the portal has
+    // actually revoked it server-side, the first real API call below will 401 and we fall through to the
+    // cached-data offline mode, same as any other login failure.
     const performLogin = async () => {
       try {
-        if (username && password) {
-          await w.student_login(username, password);
-          if (w.session) {
-            setIsAuthenticated(true);
-            setCurrentWebPortal(w);
-          }
+        const session = restoreSession(w.apiUrl);
+        if (session) {
+          w.session = session;
+          await refreshSession(w.apiUrl, session);
+          await w.get_attendance_meta(); // lightweight probe: confirms the restored session still works
+          setIsAuthenticated(true);
+          setCurrentWebPortal(w);
         }
       } catch (error) {
-        console.error("Login failed:", error);
+        console.error("Session resume failed:", error);
         const hasCachedData = hasAnyPortalData();
 
         if (hasCachedData) {
           setIsAuthenticated(true);
           setCurrentWebPortal(new ArtificialWebPortal());
           setError(null);
-        } else {
-          if (
-            error instanceof LoginError &&
-            error.message.includes(
-              "JIIT Web Portal server is temporarily unavailable",
-            )
-          ) {
-            setError(
-              "JIIT Web Portal server is temporarily unavailable. Please try again later.",
-            );
-          } else if (
-            error instanceof LoginError &&
-            error.message.includes("Failed to fetch")
-          ) {
-            setError("JIIT Web Portal server is temporarily unavailable.");
-          } else {
-            setError(
-              "Login failed. Please check your credentials and try again.",
-            );
-            setIsAuthenticated(false);
-          }
         }
+        // No saved session and no cache: leave isAuthenticated false so LoginScreen (Google Sign-In) shows.
       } finally {
         setIsLoading(false);
       }
@@ -739,6 +782,18 @@ function App() {
           />
           <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
             <Routes>
+              <Route
+                path="/import-session"
+                element={
+                  <ImportSessionWrapper
+                    onLoginSuccess={(webPortal) => {
+                      setIsAuthenticated(true);
+                      setCurrentWebPortal(webPortal);
+                    }}
+                    w={w}
+                  />
+                }
+              />
               <Route
                 path="/academic-calendar"
                 element={

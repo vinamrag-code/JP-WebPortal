@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from 'react'
 import { loadSavedTheme, applyTheme, saveTheme } from '@/lib/theme'
+import { NOCTURNE_PRESET } from '@/lib/nocturneTheme'
 
 function initializeTheme() {
     const saved = loadSavedTheme()
@@ -7,18 +8,10 @@ function initializeTheme() {
         applyTheme(saved)
         return saved
     } else {
-        const defaultDark = {
-            id: 'vercelDark',
-            name: 'Vercel Dark',
-            primary: '#ffffff',
-            secondary: '#888888',
-            background: '#000000',
-            foreground: '#1a1a1a',
-            mode: 'dark',
-            font: "'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-        }
-        applyTheme(defaultDark)
-        return defaultDark
+        // New installs default to Nocturne (the owner's Claude Design canvas). Existing users who already
+        // saved a theme are unaffected — this only applies before any theme has ever been chosen.
+        applyTheme(NOCTURNE_PRESET)
+        return NOCTURNE_PRESET
     }
 }
 

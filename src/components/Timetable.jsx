@@ -12,9 +12,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { getTimetableModifiedEvents, setTimetableIcs, getTimetableIcs, setTimetableModifiedEvents, removeTimetableModifiedEvents } from '@/components/scripts/cache';
+import { showSuccessToast } from '@/lib/toastUtils';
+import PdfTimetableImport from "./PdfTimetableImport";
+import ScheduleGrid from "./ScheduleGrid";
+import TodaySection from "./TodaySection";
+import { loadSchedule, saveSchedule, clearSchedule } from "@/lib/timetable/timetableStore";
+import { upsertClass, removeClass, setCodeAlias } from "@/lib/timetable/schedule";
 
-const Timetable = ({ w, profileData, subjectData, subjectSemestersData }) => {
+const Timetable = ({ w, profileData, subjectData, subjectSemestersData, attendanceGoal }) => {
   const [loading, setLoading] = useState(true);
+  // A PDF-imported schedule (see PdfTimetableImport/ScheduleGrid) takes over the whole page when present.
+  // Read synchronously (lazy initializer) so there's no flash of the legacy UI on first render.
+  const [schedule, setSchedule] = useState(() => loadSchedule().schedule);
+  const [showPdfImport, setShowPdfImport] = useState(false);
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [selectedVariants, setSelectedVariants] = useState([]);
   const [variantNames, setVariantNames] = useState({});
@@ -156,6 +166,40 @@ const Timetable = ({ w, profileData, subjectData, subjectSemestersData }) => {
     initTimetable();
   }, [w]);
 
+  const registeredSubjectsForScheduling = (() => {
+    const semId = selectedSemesterId || localSemestersData?.latest_semester?.registration_id;
+    return localSubjectData[semId]?.subjects ?? [];
+  })();
+
+  const handleSaveClass = (original, updated, portalAlias) => {
+    try {
+      let next = { ...schedule, classes: upsertClass(schedule, updated).classes };
+      if (portalAlias !== undefined) next = setCodeAlias(next, updated.code, portalAlias || "");
+      saveSchedule(next);
+      setSchedule(next);
+      showSuccessToast('Timetable', original ? 'Class updated.' : 'Class added.');
+    } catch (err) {
+      showErrorToast('Timetable', err?.message || 'Could not save this class.');
+    }
+  };
+
+  const handleDeleteClass = (id) => {
+    try {
+      const next = removeClass(schedule, id);
+      saveSchedule(next);
+      setSchedule(next);
+      showSuccessToast('Timetable', 'Class removed.');
+    } catch (err) {
+      showErrorToast('Timetable', err?.message || 'Could not delete this class.');
+    }
+  };
+
+  const handleResetSchedule = () => {
+    clearSchedule();
+    setSchedule(null);
+    setShowPdfImport(false);
+  };
+
   const handleFile = async (file) => {
     if (!file) return;
     try {
@@ -269,6 +313,47 @@ const Timetable = ({ w, profileData, subjectData, subjectSemestersData }) => {
         )}
       </AnimatePresence>
 
+      <div className="max-w-7xl mx-auto px-4 pt-4">
+        <TodaySection w={w} attendanceGoal={attendanceGoal} />
+      </div>
+
+      {schedule ? (
+        <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <CalendarIcon className="w-5 h-5 text-primary" /> Your Timetable ({schedule.batch})
+            </h2>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowPdfImport((v) => !v)}>
+                <RefreshCw className="w-4 h-4 mr-2" /> {showPdfImport ? "Cancel" : "Re-import PDF"}
+              </Button>
+              <Button variant="ghost" size="sm" className="text-destructive" onClick={handleResetSchedule}>
+                <Trash2 className="w-4 h-4 mr-2" /> Reset
+              </Button>
+            </div>
+          </div>
+          {showPdfImport && (
+            <PdfTimetableImport
+              registeredSubjects={registeredSubjectsForScheduling}
+              onSaved={(s) => { setSchedule(s); setShowPdfImport(false); }}
+            />
+          )}
+          <ScheduleGrid
+            schedule={schedule}
+            todayDayIndex={currentDayIndex}
+            onSaveClass={handleSaveClass}
+            onDeleteClass={handleDeleteClass}
+          />
+        </main>
+      ) : (
+      <>
+      <div className="max-w-7xl mx-auto px-4 pt-2">
+        <PdfTimetableImport
+          registeredSubjects={registeredSubjectsForScheduling}
+          onSaved={(s) => setSchedule(s)}
+        />
+      </div>
+
       <div className="border-b bg-card/50 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -381,6 +466,8 @@ const Timetable = ({ w, profileData, subjectData, subjectSemestersData }) => {
           </div>
         </section>
       </main>
+      </>
+      )}
     </div>
   );
 };

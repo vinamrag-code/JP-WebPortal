@@ -24,7 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2, ChevronRight, Archive, Calculator, BarChart3, GraduationCap, ListFilter, SortAsc, SortDesc, HelpCircle, FileText, AlertTriangle } from "lucide-react";
+import { Download, Loader2, ChevronRight, Archive, Calculator, ListFilter, SortAsc, SortDesc, HelpCircle, FileText, AlertTriangle } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Dialog,
@@ -643,7 +643,7 @@ export default function Grades({
       console.error("Failed to download marks:", err);
       updateToastError(toastId, "Download failed", err?.message || "Unable to download marks.");
       showErrorToast("Marks Download Error", err?.message || "Failed to download marks.");
-    } filll: {
+    } finally {
       setIsDownloading(false);
     }
   };
@@ -667,46 +667,22 @@ export default function Grades({
           onValueChange={handleTabChange}
           className="w-full max-w-7xl mx-auto"
         >
-          <div className="md:hidden">
-            <TabsList className="grid w-full max-w-md mx-auto grid-cols-3 mb-4 rounded-lg p-1">
+          <TabsList asChild>
+            <div className="wp-seg w-full max-w-md mx-auto mb-4">
               {[
-                { name: "overview", icon: BarChart3 },
-                { name: "marks", icon: Download },
-                { name: "semester", icon: GraduationCap }
+                { name: "overview", icon: "ph-chart-line" },
+                { name: "marks", icon: "ph-download-simple" },
+                { name: "semester", icon: "ph-graduation-cap" },
               ].map((tab) => (
-                <TabsTrigger
-                  key={tab.name}
-                  value={tab.name}
-                  className="rounded-md transition-all duration-200 flex items-center justify-center gap-1"
-                >
-                  <motion.div className="flex items-center gap-1">
-                    <tab.icon className="w-4 h-4 hidden md:inline" />
+                <TabsTrigger key={tab.name} value={tab.name} asChild>
+                  <button className={`wp-seg-opt flex-1 flex items-center justify-center gap-1.5 ${activeTab === tab.name ? "active" : ""}`}>
+                    <i className={`ph ${tab.icon}`} style={{ fontSize: 14 }} />
                     <span>{tab.name.charAt(0).toUpperCase() + tab.name.slice(1)}</span>
-                  </motion.div>
+                  </button>
                 </TabsTrigger>
               ))}
-            </TabsList>
-          </div>
-          <div className="hidden md:block">
-            <div className="flex justify-center mb-4">
-              <div className="flex bg-muted/50 rounded-lg p-1">
-                {[
-                  { id: "overview", icon: BarChart3, label: "Overview" },
-                  { id: "marks", icon: Download, label: "Marks" },
-                  { id: "semester", icon: GraduationCap, label: "Semester" }
-                ].map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => handleTabChange(t.id)}
-                    className={`px-4 py-1.5 rounded-md transition-all duration-200 flex items-center gap-2 ${activeTab === t.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                  >
-                    <t.icon className="w-4 h-4" />
-                    {t.label}
-                  </button>
-                ))}
-              </div>
             </div>
-          </div>
+          </TabsList>
           <div className="w-full max-w-7xl mx-auto">
             <TabsContent value="overview">
               <motion.div {...fadeInUp} className="space-y-4">
@@ -718,8 +694,8 @@ export default function Grades({
                   </Alert>
                 ) : (
                   <>
-                    <motion.div className="bg-card rounded-lg p-4 border border-border shadow-md">
-                      <h2 className="text-xl font-bold mb-4 text-center">Grade Progression</h2>
+                    <motion.div className="wp-card">
+                      <h2 className="text-base font-semibold mb-2 text-center">Grade Progression</h2>
                       <ResponsiveContainer width="100%" height={300}>
                         <LineChart data={semesterData} margin={{ top: 0, right: 10, left: 0, bottom: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -750,15 +726,15 @@ export default function Grades({
                         </motion.div>
                       ))}
                     </div>
-                    <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
-                      <Button variant="outline" className="h-16 flex-col gap-1" onClick={() => navigate("/gpa-calculator")}>
-                        <Calculator className="w-5 h-5 text-muted-foreground" />
+                    <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
+                      <button className="wp-card items-center gap-1" style={{ border: "1px solid hsl(var(--border))" }} onClick={() => navigate("/gpa-calculator")}>
+                        <Calculator className="w-5 h-5" style={{ color: "hsl(var(--muted-foreground))" }} />
                         <span className="text-xs">GPA Calculator</span>
-                      </Button>
-                      <Button variant="outline" className="h-16 flex-col gap-1" onClick={() => setIsDownloadDialogOpen(true)} disabled={isDownloading}>
-                        <Download className="w-5 h-5 text-muted-foreground" />
+                      </button>
+                      <button className="wp-card items-center gap-1" style={{ border: "1px solid hsl(var(--border))" }} onClick={() => setIsDownloadDialogOpen(true)} disabled={isDownloading}>
+                        <Download className="w-5 h-5" style={{ color: "hsl(var(--muted-foreground))" }} />
                         <span className="text-xs">Download Marks</span>
-                      </Button>
+                      </button>
                     </div>
                   </>
                 )}
@@ -777,7 +753,7 @@ export default function Grades({
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div className="flex items-center gap-4 flex-wrap justify-between bg-card border border-border rounded-xl p-4 shadow-sm">
+                    <div className="wp-card flex-row items-center gap-4 flex-wrap justify-between">
                       <div className="flex items-center gap-3 flex-wrap">
                         <Select onValueChange={handleSemesterChange} value={selectedGradeCardSem?.registration_id}>
                           <SelectTrigger className="w-full md:w-[250px]">
