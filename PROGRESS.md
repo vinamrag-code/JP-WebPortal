@@ -673,3 +673,55 @@ students; the native flow is a separate, temporary test screen.
   Cloud project) as the most common cause of failure - genuinely don't know if that's what happens here or not
   until it's run on the owner's phone. **Next step: install v1.9, tap "(dev) Test native Google Sign-In," and
   report what's on screen** - a real device result beats another round of desk research either way.
+
+## Native Google Sign-In: device result (17 Sep 2026)
+
+**Superseded:** the `jiitAuth.js` / `GoogleNativeTestScreen.jsx` experiment described just above was deleted on
+17 Sep (with `@capgo/capacitor-social-login` and the `CapacitorHttp` config) when the owner paused app work to
+finish the web app first. It was then revived the same day as a narrower, **isolated, uncommitted** diagnostic
+whose only job was to capture the exact native failure, not to log anyone in:
+`src/uiv2/GoogleSignInDiagnostic.jsx` (route `#/google-signin-diagnostic`, linked from the bottom of
+`LoginScreen` as "(dev) Native Google Sign-In diagnostic") plus `android/.../DiagnosticsPlugin.java` (registered
+in `MainActivity`), which shows the installed build's package name + signing SHA-1 and dumps this app's own
+Logcat lines for the plugin's tags on-screen. The plugin reports the native exception class only to Logcat, and
+the owner's phone has no adb/Logcat.
+
+**Two plugin setup gotchas hit on the way (worth knowing if this is ever picked up again):**
+- `SocialLogin.login({ options: { scopes: [...] } })` fails immediately with "You CANNOT use scopes without
+  modifying the main activity" - *any* `scopes` array trips it, even one repeating the defaults. The plugin
+  already requests `openid`, `userinfo.email` and `userinfo.profile` by default (`GoogleProvider.java`), which
+  covers what JIIT uses, so pass no `scopes` rather than modifying `MainActivity`.
+- The first diagnostic build showed an empty-looking box: the app's dark theme makes inherited text near-white, so
+  error text on a light-grey box was invisible. Any debug UI in this app needs explicit text colours.
+
+**Verbatim result** (v1.11 debug APK, owner's phone, 17 Sep 2026 01:02, JIIT's web client ID as
+`webClientId`, standard sign-in UI, no nonce):
+- Installed identity (read on-device): package `com.jportal.app`, signing SHA-1
+  `15:AA:D8:3D:DB:2D:6E:5C:79:14:01:7F:D2:C5:2D:D1:74:26:9B:1E`, matching `./gradlew signingReport`'s debug variant
+  (the shared AOSP debug keystore at `~/.android/debug.keystore` on the dev machine).
+- Failure, identical on both attempts (the initial call, then the plugin's automatic retry after clearing
+  Credential Manager's credential-selection state), ~3.5 s after each request:
+  `androidx.credentials.exceptions.GetCredentialCancellationException: [16] Account reauth failed.`
+  Code 16 is Google Play Services' generic `CommonStatusCodes.CANCELED`. The JS side only receives the plugin's
+  rewritten message ("Google Sign-In failed: [16] Account reauth failed. ..."); its `thrownType` of `xo` is just
+  Capacitor's minified JS error wrapper, not the native type.
+- **Not** `[28444] Developer console is not set up correctly` and not `DEVELOPER_ERROR (10)`, the two errors
+  desk research predicted. No ID token was issued, so there is no `aud` claim to decode.
+
+**What this does and doesn't establish:**
+- Established: the native path does not yield a token for JIIT's client ID from this app, on a real device with
+  Play Services, even after the plugin's own stale-state recovery.
+- Not established: the specific cause. Code 16 is generic. The plugin's own list of likely causes for `[16]`
+  (consent screen Internal vs External, Testing-mode test users, Android OAuth client package/SHA-1
+  registration, the user having disabled Sign in with Google for the app) are all settings inside **JIIT's**
+  Google Cloud project, which can't be viewed or changed from here. `com.jportal.app` + this SHA-1 has certainly
+  never been registered there. Whichever one it is, it can't be fixed from this side.
+- A control run would separate "device/plugin problem" from "JIIT's client refuses this app": point the same
+  diagnostic at a web client ID in a Google Cloud project the owner controls, with an Android OAuth client
+  registered for `com.jportal.app` + the SHA-1 above. Success there would prove the failure is specific to
+  JIIT's client ID. It still wouldn't produce a token JIIT's backend accepts (its `aud` would be ours), so it's
+  proof only, not a fix. Not run.
+- The diagnostic files and the reinstalled plugin (`package.json`, `pnpm-lock.yaml`, `capacitor.config.json`,
+  the `cap sync`-generated Android Gradle files, `App.jsx` route, `LoginScreen.jsx` link, `MainActivity.java`
+  registration) are deliberately **not committed** - temporary by design. Remove them all together when the
+  diagnostic is no longer needed.
