@@ -711,11 +711,17 @@ the owner's phone has no adb/Logcat.
 **What this does and doesn't establish:**
 - Established: the native path does not yield a token for JIIT's client ID from this app, on a real device with
   Play Services, even after the plugin's own stale-state recovery.
-- Not established: the specific cause. Code 16 is generic. The plugin's own list of likely causes for `[16]`
-  (consent screen Internal vs External, Testing-mode test users, Android OAuth client package/SHA-1
-  registration, the user having disabled Sign in with Google for the app) are all settings inside **JIIT's**
-  Google Cloud project, which can't be viewed or changed from here. `com.jportal.app` + this SHA-1 has certainly
-  never been registered there. Whichever one it is, it can't be fixed from this side.
+- Cause, narrowed by elimination (not directly proven - code 16 itself is generic): the owner confirmed Google's
+  account picker appeared and they chose their `@mail.jiit.ac.in` account - the **same account** that signs in
+  successfully on JIIT's own website with the **same client ID**. That rules out every account- or
+  consent-level cause on the plugin's list for `[16]` (consent screen Internal vs External, Testing-mode test
+  users, Sign in with Google disabled for the app, Family Link): any of those would break the website too. What
+  differs between the working web flow and the failing native one is the calling app's identity - for native
+  requests Google also checks the Android package name + signing SHA-1 against an **Android** OAuth client in
+  the same Cloud project, and `com.jportal.app` + this SHA-1 has certainly never been registered in JIIT's.
+  That is the most likely cause, and only JIIT can change it (the portal's own `/token/productversion` response
+  lists `erpsupport@mail.jiit.ac.in` as its support contact; a release build would also need the release
+  keystore's SHA-1 registered).
 - A control run would separate "device/plugin problem" from "JIIT's client refuses this app": point the same
   diagnostic at a web client ID in a Google Cloud project the owner controls, with an Android OAuth client
   registered for `com.jportal.app` + the SHA-1 above. Success there would prove the failure is specific to
