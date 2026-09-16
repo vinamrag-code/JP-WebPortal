@@ -17,13 +17,31 @@ function urgencyColor(pct, goal) {
 
 const TYPE_LETTER = { L: "L", T: "T", P: "P" };
 
+function toWidgetRow(r, goal) {
+  return {
+    short: shortNameFor(r.name, r.code),
+    name: r.name,
+    time: r.startText,
+    type: TYPE_LETTER[r.type] ?? r.type,
+    room: r.room,
+    isFinished: r.status === "finished",
+    hasPct: r.percent !== null,
+    pctText: r.percent !== null ? `${Math.round(r.percent)}%` : "–",
+    color: urgencyColor(r.percent, goal),
+  };
+}
+
 /**
- * Home-screen widget snapshot: every class for the day (today, or the next day with classes once today's
- * over), like jiit-widget's own widget - not just the current class plus a couple of upcoming ones, so an
- * updated timetable with many classes left in the day shows all of them, scrollable, with finished classes
- * dimmed rather than dropped. `attendance` is the raw response `w.get_attendance()` already returned to the
- * Attendance screen this session (passed down from App.jsx's state) - the widget has no live portal session
- * of its own, so a class's % only appears once the user has opened Attendance at least once.
+ * Home-screen widget snapshot, matching the "JP WebPortal" Nocturne design (Claude Design canvas): a
+ * featured card up top for the current class (or, once it's over, the next one) labelled "Current Class" /
+ * "Next Class", then every other class of the day below as its own row - like jiit-widget's own widget, not
+ * just a couple of upcoming ones, so a busy remaining day shows all of it, scrollable. The featured class
+ * is not repeated in that list. Finished classes there are dimmed (not dropped) by the native side, which
+ * applies `isFinished` as reduced row alpha rather than recolouring text.
+ *
+ * `attendance` is the raw response `w.get_attendance()` already returned to the Attendance screen this
+ * session (passed down from App.jsx's state) - the widget has no live portal session of its own, so a
+ * class's % only appears once the user has opened Attendance at least once.
  */
 export function buildWidgetSnapshot(attendance, goal = DEFAULT_ATTENDANCE_GOAL) {
   const schedule = loadSchedule().schedule;
@@ -33,19 +51,15 @@ export function buildWidgetSnapshot(attendance, goal = DEFAULT_ATTENDANCE_GOAL) 
 
   const view = buildTodayView(schedule, attendance ?? null, { goal });
 
+  const activeRow = view.rows.find((r) => r.status === "now") ?? view.rows.find((r) => r.status === "upcoming") ?? null;
+  const activeLabel = activeRow ? (activeRow.status === "now" ? "Current Class" : "Next Class") : "";
+
   return {
     hasSchedule: true,
     dayLabel: view.label,
-    rows: view.rows.map((r) => ({
-      short: shortNameFor(r.name, r.code),
-      time: r.startText,
-      type: TYPE_LETTER[r.type] ?? r.type,
-      room: r.room,
-      isFinished: r.status === "finished",
-      hasPct: r.percent !== null,
-      pctText: r.percent !== null ? `${Math.round(r.percent)}%` : "–",
-      color: urgencyColor(r.percent, goal),
-    })),
+    activeLabel,
+    active: activeRow ? toWidgetRow(activeRow, goal) : null,
+    rows: view.rows.filter((r) => r !== activeRow).map((r) => toWidgetRow(r, goal)),
   };
 }
 

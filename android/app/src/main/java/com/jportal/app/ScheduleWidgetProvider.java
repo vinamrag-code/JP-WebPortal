@@ -65,15 +65,21 @@ public class ScheduleWidgetProvider extends AppWidgetProvider {
         views.setEmptyView(R.id.widget_list, R.id.widget_empty);
 
         JSONArray rows = null;
+        JSONObject active = null;
+        String activeLabel = "";
         String dayLabel = "Timetable";
         String emptyMessage = "Open JP WebPortal to load your schedule";
+        boolean hasSchedule = false;
 
         if (json != null) {
             try {
                 JSONObject data = new JSONObject(json);
-                if (data.optBoolean("hasSchedule", false)) {
+                hasSchedule = data.optBoolean("hasSchedule", false);
+                if (hasSchedule) {
                     dayLabel = data.optString("dayLabel", "Today");
                     rows = data.optJSONArray("rows");
+                    active = data.optJSONObject("active");
+                    activeLabel = data.optString("activeLabel", "");
                     emptyMessage = "No classes";
                 } else {
                     emptyMessage = "Import your timetable in the app";
@@ -86,6 +92,32 @@ public class ScheduleWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.widget_title, dayLabel);
         views.setTextViewText(R.id.widget_status, "");
         views.setTextViewText(R.id.widget_empty, emptyMessage);
+
+        // Featured card: today's current class, or the next one once there's no class running. Shown only
+        // once - it is excluded from `rows` on the JS side - so the day isn't summarised twice.
+        boolean showFeatured = active != null;
+        boolean showAllDone = hasSchedule && active == null;
+        views.setViewVisibility(R.id.widget_featured, showFeatured ? android.view.View.VISIBLE : android.view.View.GONE);
+        views.setViewVisibility(R.id.widget_featured_alldone, showAllDone ? android.view.View.VISIBLE : android.view.View.GONE);
+        if (showFeatured) {
+            String subject = active.optString("short", "");
+            String name = active.optString("name", "");
+            String time = active.optString("time", "");
+            String type = active.optString("type", "");
+            String room = active.optString("room", "");
+            boolean hasPct = active.optBoolean("hasPct", false);
+
+            StringBuilder meta = new StringBuilder(time);
+            if (!type.isEmpty()) meta.append(" · ").append(type);
+            if (!room.isEmpty()) meta.append(" · ").append(room);
+
+            views.setTextViewText(R.id.widget_featured_label, activeLabel);
+            views.setTextViewText(R.id.widget_featured_short, subject);
+            views.setTextViewText(R.id.widget_featured_name, name);
+            views.setTextViewText(R.id.widget_featured_meta, meta.toString());
+            views.setTextViewText(R.id.widget_featured_pct, hasPct ? active.optString("pctText", "–") : "–");
+            views.setTextColor(R.id.widget_featured_pct, hasPct ? parseColor(active.optString("color", ""), 0xFF8B8FA3) : 0xFF8B8FA3);
+        }
 
         RemoteViewsCompat.RemoteCollectionItems.Builder itemsBuilder =
             new RemoteViewsCompat.RemoteCollectionItems.Builder().setViewTypeCount(1);
@@ -119,10 +151,11 @@ public class ScheduleWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.row_attendance, hasPct ? row.optString("pctText", "–") : "–");
 
         int mutedColor = 0xFF8B8FA3;
-        int subjectColor = isFinished ? mutedColor : 0xFFE8E9F0;
-        int attendanceColor = isFinished || !hasPct ? mutedColor : parseColor(row.optString("color", ""), mutedColor);
-        views.setTextColor(R.id.row_subject, subjectColor);
-        views.setTextColor(R.id.row_attendance, attendanceColor);
+        views.setTextColor(R.id.row_subject, 0xFFE8E9F0);
+        views.setTextColor(R.id.row_attendance, hasPct ? parseColor(row.optString("color", ""), mutedColor) : mutedColor);
+        // Upcoming classes stay at full brightness; finished ones dim as a whole row rather than
+        // recolouring their text, so the day's shape (what's left, what's done) reads at a glance.
+        views.setFloat(R.id.row_root, "setAlpha", isFinished ? 0.5f : 1f);
 
         views.setOnClickFillInIntent(R.id.row_root, new Intent());
         return views;
