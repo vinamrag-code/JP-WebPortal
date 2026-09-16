@@ -273,12 +273,19 @@ export const setUsername = (username) => { try { localStorage.setItem('username'
 export const getUsername = () => { try { return localStorage.getItem('username'); } catch (e) { return null; } };
 export const removeUsername = () => { try { localStorage.removeItem('username'); } catch (e) { } };
 
-export const setPassword = (password) => { try { localStorage.setItem('password', password); } catch (e) { } };
-export const getPassword = () => { try { return localStorage.getItem('password'); } catch (e) { return null; } };
+// setPassword/getPassword/setCredentials are gone - the portal dropped password login for students (see
+// @/lib/googleAuth). removePassword stays: logout still clears any leftover password from before that
+// migration.
 export const removePassword = () => { try { localStorage.removeItem('password'); } catch (e) { } };
 
-export const setCredentials = (username, password) => { setUsername(username); setPassword(password); };
-export const clearCredentials = () => { removeUsername(); removePassword(); };
+// Google-login session snapshot (replaces password storage for the student login flow - see
+// @/lib/googleAuth). Holds everything needed to rebuild a working WebPortal session on the next app
+// launch without going through Google sign-in again: the bearer token, the fields jsjiit's session object
+// carries, and `googleUsername`/`tokenDate`, which are what the portal's own `/token/refreshTokenRequest`
+// needs to extend the session server-side.
+export const setGoogleSession = (session) => { try { localStorage.setItem('googleSession', JSON.stringify(session)); } catch { /* storage unavailable */ } };
+export const getGoogleSession = () => { try { const raw = localStorage.getItem('googleSession'); return raw ? JSON.parse(raw) : null; } catch { return null; } };
+export const clearGoogleSession = () => { try { localStorage.removeItem('googleSession'); } catch { /* storage unavailable */ } };
 
 export const getDefaultTab = () => { try { return localStorage.getItem('defaultTab') || '/attendance'; } catch (e) { return '/attendance'; } };
 export const setDefaultTab = (tab) => { try { localStorage.setItem('defaultTab', tab); } catch (e) { } };

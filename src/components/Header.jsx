@@ -7,6 +7,7 @@ import { Utensils, ArrowLeft, WifiOff, Info } from 'lucide-react';
 import SettingsDialog from './SettingsDialog';
 import { removePassword } from '@/components/scripts/cache';
 import { ArtificialWebPortal } from './scripts/artificialW';
+import { clearSavedGoogleSession } from '@/lib/googleAuth';
 
 const Header = ({ setIsAuthenticated, messMenuOpen, onMessMenuChange, attendanceGoal, setAttendanceGoal, w }) => {
   const navigate = useNavigate();
@@ -32,6 +33,8 @@ const Header = ({ setIsAuthenticated, messMenuOpen, onMessMenuChange, attendance
 
   const handleLogout = () => {
     removePassword();
+    clearSavedGoogleSession();
+    if (w) w.session = null;
     setIsAuthenticated(false);
     navigate('/login');
   };

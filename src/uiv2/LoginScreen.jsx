@@ -1,12 +1,9 @@
 import { useEffect, useState } from "react";
 import PropTypes from "prop-types";
-import { LoginError } from "https://cdn.jsdelivr.net/npm/jsjiit@0.0.28/dist/jsjiit.esm.js";
-import { showErrorToast, showSuccessToast } from "@/lib/toastUtils";
+import { showSuccessToast } from "@/lib/toastUtils";
 import { ArtificialWebPortal } from "@/components/scripts/artificialW";
+import { buildBookmarklet, WEBKIOSK_LOGIN_URL } from "@/lib/googleAuth";
 import {
-  setCredentials,
-  getUsername,
-  getPassword,
   hasCachedProfile,
   hasAnyAttendance,
   hasAnyGrades,
@@ -15,63 +12,39 @@ import {
 /**
  * Login screen for the Nocturne UI (src/uiv2/), matching the owner's Claude Design canvas
  * ("JP WebPortal.dc.html"). Same integration contract as the legacy `Login.jsx` (`{ w, onLoginSuccess }`), so
- * it drops into `LoginWrapper` in App.jsx unchanged — only the presentation is new; the login call
- * (`w.student_login`), credential persistence, error handling and the offline (cached-data) fallback are the
- * same real logic the rest of the app already relies on.
+ * it drops into `LoginWrapper` in App.jsx unchanged.
+ *
+ * The portal dropped username/password login for students in favor of Google Sign-In (16 Sep 2026), and a
+ * button rendered on jportal's own origin cannot work - Google only authorizes the portal's own origin for
+ * that OAuth client, and there's no SDK/library workaround (see `@/lib/googleAuth` and PROGRESS.md for the
+ * full trail). So this screen walks the student through the bookmarklet handoff instead: sign in on the
+ * portal's own real page once, and a small script captures the resulting session for jportal. The offline
+ * (cached-data) fallback is unchanged.
  */
-export default function LoginScreen({ w, onLoginSuccess }) {
-  const [enrollment, setEnrollment] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+export default function LoginScreen({ onLoginSuccess }) {
   const [hasCache, setHasCache] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [bookmarklet, setBookmarklet] = useState("");
 
   useEffect(() => {
     setHasCache(hasCachedProfile() || hasAnyAttendance() || hasAnyGrades());
-    const savedUsername = getUsername();
-    const savedPassword = getPassword();
-    if (savedUsername && savedPassword) {
-      setEnrollment(savedUsername);
-      setPassword(savedPassword);
-    }
+    setBookmarklet(buildBookmarklet());
   }, []);
 
-  const submit = async () => {
-    if (!enrollment.trim() || !password.trim()) {
-      setError("Enter your enrollment number and password.");
-      return;
-    }
-    setLoading(true);
-    setError("");
+  const copyBookmarklet = async () => {
     try {
-      await w.student_login(enrollment.trim(), password);
-      setCredentials(enrollment.trim(), password);
-      showSuccessToast("Login successful", "Welcome back!");
-      onLoginSuccess(w);
-    } catch (err) {
-      const isAuthError = err instanceof LoginError;
-      const cached = hasCachedProfile() || hasAnyAttendance() || hasAnyGrades();
-      if (isAuthError) {
-        setError(err.message || "Login failed. Please check your credentials.");
-        showErrorToast("Login Failed", err.message || "Please check your credentials.");
-      } else if (cached) {
-        showSuccessToast("Offline mode enabled", "Using cached data for offline access.");
-        onLoginSuccess(new ArtificialWebPortal());
-        return;
-      } else {
-        setError(err.message || "Unable to login. Please try again.");
-        showErrorToast("Login Failed", err.message || "Unable to login. Please try again.");
-      }
-    } finally {
-      setLoading(false);
+      await navigator.clipboard.writeText(bookmarklet);
+      setCopied(true);
+      showSuccessToast("Copied", "Paste this as a new bookmark's URL.");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
     }
   };
 
   const handleOfflineMode = () => {
     if (!hasCache) {
-      setError("No cached data available. Please login online first to use offline mode.");
-      showErrorToast("Offline unavailable", "No cached data available. Please login online first.");
+      showSuccessToast("Offline unavailable", "No cached data available yet - sign in online first.");
       return;
     }
     showSuccessToast("Offline mode enabled", "Using cached data for offline access.");
@@ -86,7 +59,7 @@ export default function LoginScreen({ w, onLoginSuccess }) {
         </h1>
       </div>
 
-      <div className="flex-1 flex flex-col justify-center px-6 py-6 gap-6">
+      <div className="flex-1 flex flex-col justify-center px-6 py-6 gap-5 overflow-y-auto">
         <div className="flex flex-col gap-1.5 items-start">
           <div
             className="w-11 h-11 rounded-xl flex items-center justify-center"
@@ -109,73 +82,50 @@ export default function LoginScreen({ w, onLoginSuccess }) {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3.5">
-          <div>
-            <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>
-              Enrollment Number
-            </label>
-            <div className="relative">
-              <i
-                className="ph ph-user absolute left-3 top-1/2 -translate-y-1/2 text-base"
-                style={{ color: "hsl(var(--muted-foreground))" }}
-              />
-              <input
-                className="wp-input pl-9"
-                type="text"
-                value={enrollment}
-                onChange={(e) => setEnrollment(e.target.value)}
-                placeholder="e.g. 23103045"
-                autoComplete="username"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>
-              Password
-            </label>
-            <div className="relative">
-              <i
-                className="ph ph-lock absolute left-3 top-1/2 -translate-y-1/2 text-base"
-                style={{ color: "hsl(var(--muted-foreground))" }}
-              />
-              <input
-                className="wp-input pl-9 pr-11"
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                autoComplete="current-password"
-                onKeyDown={(e) => e.key === "Enter" && submit()}
-              />
-              <button
-                type="button"
-                className="wp-icon-btn absolute right-1 top-1/2 -translate-y-1/2"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
+        <div className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: "hsl(var(--muted))" }}>
+          <p className="text-[12.5px] font-semibold" style={{ color: "hsl(var(--foreground))" }}>
+            The portal now requires Google sign-in, which only works on its own site — so sign in there once,
+            then use this sign-in helper to bring your session here:
+          </p>
+          <ol className="text-[12.5px] flex flex-col gap-1.5 list-decimal list-inside" style={{ color: "hsl(var(--muted-foreground))" }}>
+            <li>
+              Drag this to your bookmarks bar (or, on mobile, copy it below and paste as a new bookmark&apos;s
+              URL):{" "}
+              <a
+                href={bookmarklet}
+                className="inline-block px-2 py-1 rounded-md text-[11.5px] font-semibold"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                onClick={(e) => e.preventDefault()}
               >
-                <i className={`ph ${showPassword ? "ph-eye-slash" : "ph-eye"}`} style={{ fontSize: 18 }} />
-              </button>
-            </div>
-          </div>
+                JP Sign-In Helper
+              </a>
+            </li>
+            <li>
+              Open{" "}
+              <a
+                href={WEBKIOSK_LOGIN_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+                style={{ color: "hsl(var(--primary))" }}
+              >
+                the WebKiosk login page
+              </a>{" "}
+              in a new tab.
+            </li>
+            <li>Tap the bookmarklet first (it&apos;ll show a &quot;Ready&quot; alert).</li>
+            <li>Then click &quot;Sign in with Google&quot; as normal — you&apos;ll land back here signed in.</li>
+          </ol>
+          <button
+            type="button"
+            className="wp-btn"
+            style={{ background: "transparent", borderColor: "hsl(var(--border))", color: "hsl(var(--foreground))" }}
+            onClick={copyBookmarklet}
+          >
+            <i className={`ph ${copied ? "ph-check" : "ph-copy"}`} />
+            <span>{copied ? "Copied" : "Copy sign-in helper code"}</span>
+          </button>
         </div>
-
-        {error && (
-          <div className="flex items-center gap-1.5 text-[12.5px]" style={{ color: "hsl(var(--destructive))" }} role="alert">
-            <i className="ph ph-warning-circle" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <button className="wp-btn" onClick={submit} disabled={loading}>
-          {loading ? (
-            <>
-              <i className="ph ph-circle-notch" style={{ fontSize: 16, animation: "spin 0.8s linear infinite" }} />
-              <span>Signing in…</span>
-            </>
-          ) : (
-            <span>Log in</span>
-          )}
-        </button>
 
         <div className="flex items-center gap-2.5">
           <div className="flex-1 h-px" style={{ background: "hsl(var(--border))" }} />
@@ -203,6 +153,5 @@ export default function LoginScreen({ w, onLoginSuccess }) {
 }
 
 LoginScreen.propTypes = {
-  w: PropTypes.object.isRequired,
   onLoginSuccess: PropTypes.func.isRequired,
 };

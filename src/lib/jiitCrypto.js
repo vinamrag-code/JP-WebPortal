@@ -32,3 +32,27 @@ export async function serialize_payload(payload) {
   const pbytes = await encrypt(raw);
   return base64Encode(pbytes);
 }
+
+const LOCALNAME_CHARSET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+function randomChars(n) {
+  let out = "";
+  for (let i = 0; i < n; i++) {
+    out += LOCALNAME_CHARSET[Math.floor(Math.random() * LOCALNAME_CHARSET.length)];
+  }
+  return out;
+}
+
+/**
+ * The `LocalName` request header the portal's API expects on every call (authenticated or not) - a
+ * date-derived nonce, same scheme as the login/session payload encryption above (jsjiit's private `T()`,
+ * reimplemented here since jsjiit only exports `WebPortal`/`LoginError`, not this helper). Needed once
+ * login stopped going through jsjiit's own `student_login` (see `@/lib/googleAuth`) - jsjiit's `WebPortal`
+ * still generates this internally for calls made through it, but a hand-built session's `get_headers()`
+ * has to produce the same thing itself.
+ */
+export async function generateLocalName() {
+  const plaintext = new TextEncoder().encode(randomChars(4) + generate_date_seq() + randomChars(5));
+  const encrypted = await encrypt(plaintext);
+  return base64Encode(encrypted);
+}

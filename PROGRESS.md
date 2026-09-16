@@ -460,3 +460,216 @@ Vitest tests (34 new tests, 42 total across the phase). Not yet wired into any U
   `~/projects/jiit-jportal/jiit-widget/app/src/main/java/com/vinamra/jiitwidget/timetable/TimetableData.kt`.
 - Known quirks to handle: electives are printed as `LALL(...)`; the portal lists VLSI as `25B22EC311` while the PDF has
   `26B42EC313`; portal subject codes appear as `"NAME(CODE)"`; teacher abbreviation tables in the PDF are unreliable.
+
+## Home-screen widget: current/next class featured, rest of day as dim/bright cards (15 Sep 2026)
+
+The Android widget (`ScheduleWidgetProvider`/`widget_schedule.xml`, already built earlier under J5 though PROGRESS's
+table above still shows it ⏳ — worth reconciling next time J5 status is touched) didn't match the "JP WebPortal"
+Nocturne mockup in the Claude Design canvas project (`c9761a04-842d-42d7-bc94-6c272e0ca578`, file `JP WebPortal.dc.html`,
+read via the `claude_design` MCP server — added this session with `claude mcp add --transport http claude_design
+https://api.anthropic.com/v1/design/mcp -s user`; needed a session restart before its tools loaded). Owner's spec,
+confirmed after a round of clarification: current/next class as a featured card at the top, everything else for the
+day below as its own row — **upcoming rows bright, finished rows dimmed** (not the reverse, and not text-only rows).
+
+- **`src/lib/nativeWidget.js`**: `buildWidgetSnapshot` now splits `buildTodayView`'s rows into `active` (the row with
+  status `"now"`, else the first `"upcoming"` one) with an `activeLabel` ("Current Class"/"Next Class"), and `rows`
+  = every other row (finished and upcoming alike) with `active` excluded so the day isn't shown twice.
+- **Android**: new `widget_featured_background.xml` drawable (accent `#9184d9` at 14%/35% alpha, matching the design's
+  `color-mix` card exactly since it paints over the widget's opaque dark background); `widget_schedule.xml` gained the
+  featured card block plus a "No more classes today" fallback text, both toggled by `ScheduleWidgetProvider`. Row
+  dimming moved from recoloring text to `views.setFloat(R.id.row_root, "setAlpha", isFinished ? 0.5f : 1f)` on the
+  existing `widget_row.xml` — simpler, and it dims the row as a whole rather than just its text.
+- **Verified**: `:app:compileDebugJavaWithJavac` and a full `:app:assembleDebug` both succeed (JDK 17 fails on this
+  project — `capacitor-android` needs source release 21; use `~/.local/jdk-21`, not the jiit-widget README's JDK 17).
+  All 73 Vitest tests still pass; no existing test touched `nativeWidget.js`'s snapshot shape.
+- **Not done**: no on-device check (same no-KVM/no-emulator constraint as `jiit-widget`) — worth a look once there's a
+  way to install the debug APK on the owner's phone. The featured card's pct doesn't use a rounded pill background
+  like the mockup (colored bold text instead, matching `widget_row`'s existing style) — RemoteViews can't cheaply
+  recolor a pill drawable per-item at runtime; revisit only if the owner minds.
+
+## Login: the portal replaced student password login with Google Sign-In (16 Sep 2026)
+
+**Discovered when:** the owner tried an older APK and got "failed to fetch" - not the portal being down (the
+original suspicion), but JIIT switching student login on the WebKiosk website to a "Sign in with Google" button;
+the owner confirmed they no longer have a password to log in with anywhere.
+
+**How this was diagnosed** (no devtools/browser access in this environment - reconstructed by reading the live
+site's code instead): `jsjiit`/`pyjiit` GitHub issues and commits (nothing newer than Aug 2026, nothing about
+Google) ruled out an already-documented fix. Fetching `https://webportal.jiit.ac.in:6011/studentportal/`'s HTML
+turned up `<script src="https://accounts.google.com/gsi/client">` - Google Identity Services - confirming JIIT
+stood up a **new Angular "CampusLynx" frontend** at that path (separate from the old JSP `webkiosk.jiit.ac.in`,
+same backend port). Downloading and reading its minified `main.*.js` directly (`curl` + `grep`/Python, no
+execution) found the whole mechanism in readable strings: `pwdloginsevices` still posts to
+`/token/generatewebtoken` (jsjiit's own endpoint, unchanged, still used for non-student user types), but for
+students a `handleCredentialResponse` posts a Google ID token to a server-config-supplied endpoint instead. The
+owner then supplied three live captures (from their own browser DevTools) that pinned the exact values: the
+`/token/productversion` config response only carries the fields shown to the version footer, not login-config
+fields (there was no second visible request in the owner's capture, so those exact server-side field names on
+the login form's own call remain unconfirmed) - but the request name (`generatetokengooglesignin`), a captured
+**response body** (matching jsjiit's session fields exactly: `clientid`, `Username`, `name`, `enrollmentno`,
+`memberid`, `userid`, `label`, `value`), and the rendered Google button's iframe `src` (containing the literal
+`client_id`) were enough to fully pin the flow down. Direct `curl` probing of `/token/productversion` got a
+silent empty `200` on every variation tried (WAF blocking non-browser requests, presumably) - a real limitation
+worth remembering if this needs re-verifying without a live browser again.
+
+**The mechanism** (unchanged: everything past login - attendance, grades, timetable, the `Bearer` header, the
+date-derived `LocalName` header jiit-widget already reverse-engineered - is exactly what jsjiit already
+implements):
+1. Google Identity Services renders a real "Sign in with Google" button (`google.accounts.id.initialize({
+   client_id, callback }) `+ `renderButton`) - client_id `395311773821-85mh9upf35k1q4nc1rmhncmnhmc8v2ed
+   .apps.googleusercontent.com`, confirmed live from the button's own rendered iframe `src`.
+2. On success, POST `{googleToken: <Google ID token>, modulename: "studentportal"}` to
+   `/token/generatetokengooglesignin` (relative to the same `apiUrl` jsjiit already uses - via the app's
+   existing CORS proxy, `src/lib/api.js`'s `proxy_url`, not `webportal.jiit.ac.in:6011` directly, since jsjiit's
+   own code already warns direct browser calls hit CORS).
+3. The response is shaped exactly like jsjiit's own login response (`token`, `clientid`, `enrollmentno`,
+   `membertype`, `name`, `Username`, `label`/`value` for institute) - it's what makes reusing the rest of jsjiit
+   unmodified possible.
+4. **Session extension without Google**: the portal's own frontend calls `/token/refreshTokenRequest` with just
+   `{username: <the captured "Username" field>, tokendate: <ISO string from login time>}` on a 401 - a
+   **server-side** extension (the *same* bearer token keeps working afterward; the response is just
+   `{msg: "Success"}`, not a new token). No Google credential needed for this - the owner asked to minimize how
+   often Google sign-in is seen again, and this is the mechanism that does it.
+
+**What was built** (`jportal` only, per the owner's call - `jiit-widget` is paused and shares none of this code):
+- **`src/lib/jiitCrypto.js`**: added `generateLocalName()` - jsjiit's own `LocalName` header generator (`T()`
+  internally) isn't exported (only `WebPortal`/`LoginError` are, from the jsdelivr CDN build), so a hand-built
+  session object needs its own copy to produce headers the backend accepts. Reuses the file's existing
+  `encrypt()`/`base64Encode()`; the date-derived-key AES-CBC scheme underneath was already implemented here for
+  Fee payloads and is unchanged.
+- **`src/lib/googleAuth.js`** (new): loads the GSI script, renders the button, exchanges the credential, and -
+  since jsjiit's `WebPortal.session` is just a plain settable property, not encapsulated - builds a plain object
+  shaped like jsjiit's own (private, unexported) `WebPortalSession` and assigns it directly to `w.session`. Every
+  other `WebPortal` method (`get_attendance`, `get_gradecard`, ...) keeps working unmodified, since they only
+  ever call `this.session.get_headers()`. That `get_headers()` also proactively calls `refreshSession()` when
+  within a minute of the token's own baked-in `exp` claim, so an active session refreshes itself before a real
+  request would 401. `restoreSession()` rebuilds the same object from a cached snapshot on the next app launch
+  (no Google prompt) - see below.
+- **`src/components/scripts/cache.js`**: added `setGoogleSession`/`getGoogleSession`/`clearGoogleSession`,
+  storing the full session snapshot (token, institute/member ids, `Username`, `tokenDate`) as one JSON blob -
+  password storage (`setPassword`/`getPassword`) is left in place (still used by the dead legacy
+  `src/components/Login.jsx`, which nothing imports) but no longer written to by the real login path.
+- **`src/uiv2/LoginScreen.jsx`**: password form replaced with Google's own rendered button
+  (`renderGoogleButton`); the offline/cached-data fallback (`ArtificialWebPortal`) and its manual "Offline Mode"
+  button are unchanged.
+- **`src/App.jsx`**: the silent auto-login effect (`username && password` → `student_login`) replaced with
+  `restoreSession()` + a `get_attendance_meta()` probe call (the lightest authenticated endpoint, confirms the
+  restored session actually still works instead of trusting the cached snapshot blindly) - falling through to
+  the existing cached-data (`ArtificialWebPortal`) path on failure, same as before. `LoginError` import and the
+  old password-specific error-message branches were removed (nothing throws `LoginError` on this path anymore).
+- **`src/components/Header.jsx`**: `handleLogout` now also clears the Google session cache and nulls `w.session`
+  (previously only cleared the stored password, which - now that there's no password - left the real session
+  untouched on logout).
+- **Verified**: full Vitest suite (73 tests, all pre-existing - no test covered login) and `vite build` both
+  pass. `googleAuth.js`, the `jiitCrypto.js` addition, and `LoginScreen.jsx` are lint-clean; the few new
+  `react/prop-types` lint hits in `App.jsx`/`Header.jsx` are the same pre-existing category (the whole file has
+  no PropTypes) as the code they sit next to, not a new class of problem.
+
+**Not done / real risks, worth knowing before trusting this fully:**
+- **No live test with a real Google account** - this environment has no browser, so the actual token exchange
+  (`generatetokengooglesignin`'s exact response field names beyond what the owner's one capture showed, whether
+  it needs a `LocalName` header at all, whether `refreshTokenRequest` truly doesn't rotate the token) is
+  reconstructed from static analysis plus one real login capture, not fully round-tripped end to end. **The
+  owner should try signing in for real (web build or the APK) before relying on this** - if anything 401s
+  immediately after a successful Google sign-in, the first thing to check is whether
+  `generatetokengooglesignin` actually needs the `LocalName` header (unauthenticated portal calls in the *old*
+  jsjiit flow always send it; the *new* Angular frontend's interceptor only adds it once a Token already exists
+  - this code sends it defensively on the exchange call, but that guess is unverified).
+- ~~**Google Identity Services inside the Capacitor Android WebView is unverified.** GSI's iframe-button flow is
+  generally WebView-safe...~~ **Wrong, corrected below (17 Sep 2026):** Google blocks its sign-in flow inside
+  *any* embedded WebView (JS-based detection, not just user-agent sniffing) since July 2023, regardless of
+  which origin hosts the button. This ruled out embedding the portal's own page too, not just our own origin.
+- **`generatetokengooglesignin`'s exact full URL was never directly confirmed** - assumed to be
+  `<apiUrl>/token/generatetokengooglesignin` by the same pattern every other endpoint follows
+  (`/token/pretoken-check`, `/token/generatewebtoken`, `/token/productversion`, `/token/refreshTokenRequest` -
+  all confirmed literal strings from the bundle), and the owner did confirm the request *name* matches, just not
+  the full path with a copy-paste.
+- `jiit-widget` (native Kotlin, paused) has the identical problem and none of this port - it still calls the
+  dead `pretoken-check`/`generatewebtoken` flow. Not touched, per the owner's call to fix `jportal` only for now.
+
+## Login continued: origin_mismatch confirmed live, bookmarklet built, then a native-sign-in experiment (16-17 Sep 2026)
+
+**The JS-button approach failed exactly as flagged as a risk above**, but for a *different, harder* reason than
+"`LocalName` header guessed wrong": the owner tested the dev server and got Google's own `Error 400:
+origin_mismatch` - Google enforces an **allowlist of authorized JavaScript origins per OAuth client ID**,
+server-side, in Google Cloud Console. That client ID (`395311773821-....apps.googleusercontent.com`) is JIIT's,
+authorized only for their own origin. We have no access to their Cloud project, so **no origin we control can
+ever pass this check** - not the dev server, not a Vercel deploy, not the Capacitor app's WebView origin. This
+is a hard wall, confirmed live, not a bug to fix.
+
+**Researched and ruled out every alternative before landing on the current approach:**
+- **Embedding the portal's real (authorized) login page in an in-app WebView** (e.g. `@capacitor/inappbrowser`,
+  which does support `executeScript` to read a loaded page's `localStorage` after login - the mechanism would
+  have worked) - blocked by a *separate* Google policy: sign-in inside *any* embedded WebView has returned
+  `disallowed_useragent` since July 2023, via JS-based detection (not spoofable), independent of origin.
+- **Native Android Credential Manager** (`GetGoogleIdOption().setServerClientId(webClientId)`) - confirmed via
+  Google's own docs that this *also* requires the calling app's package name + signing SHA-1 to be registered as
+  an **Android**-type OAuth client under the **same** Google Cloud project as the web client ID - i.e. JIIT would
+  have to authorize our app specifically. Same underlying wall (we don't own their project), different symptom
+  (`DEVELOPER_ERROR`/`[28444]` instead of `origin_mismatch`).
+- **JIIT's own official mobile app** ("JIIT Scholar OnLine," Play Store `ac.in.jiit.student.jiit_student`) was
+  floated as a lead (its listing mentions OTP login, which would sidestep Google entirely) - the owner says it's
+  outdated and doesn't work properly, so this wasn't pursued further.
+
+**Built (session-owner-confirmed direction, since a single one-click Google button is architecturally
+impossible without JIIT's cooperation): a bookmarklet handoff.** The student signs in once on the portal's own
+real page (where Google's button *does* work, since that origin *is* authorized), and a bookmarklet - which
+runs as that page's own script, so it isn't cross-origin - captures the session and hands it to jportal.
+- **`src/lib/googleAuth.js`**: rewritten. Dropped the dead GSI-button code (`renderGoogleButton`,
+  `loginWithGoogleCredential`, the script loader - all unconditionally broken by `origin_mismatch`). Added
+  `buildBookmarklet(targetOrigin)`, which generates a `javascript:` URI that **patches `window.fetch`** to watch
+  for the `generatetokengooglesignin` response *before* the user clicks "Sign in with Google" (install and run
+  the bookmarklet first, then sign in) - this intercepts the network response directly rather than reading the
+  portal's own `localStorage` afterward, because their frontend doesn't persist every field jsjiit's session
+  needs (`memberid`, confirmed absent from the full list of `localStorage.setItem` keys in their bundle) - only
+  the live response has everything. On a match it redirects to `<jportal origin>/#/import-session?<response as
+  query params>`. `importSession(w, params)` (renamed from the old `loginWithGoogleCredential`) builds the same
+  jsjiit-session-shaped object as before from those params. `restoreSession`/`refreshSession`/session caching
+  are unchanged from the earlier build.
+- **`src/uiv2/LoginScreen.jsx`**: rewritten again. Dropped the (permanently broken) Google button; shows numbered
+  instructions plus a draggable bookmarklet link (`buildBookmarklet()`), a link to open WebKiosk's real login
+  page in a new tab, and a "copy code" fallback for mobile (dragging to a bookmarks bar doesn't work well
+  there - the copy goes into a manually-created bookmark's URL field instead). Offline mode unchanged.
+- **`src/App.jsx`**: added `ImportSessionWrapper` (a `/import-session` route, always reachable regardless of
+  auth state, same as `/academic-calendar`) that reads the redirect's query params via `useSearchParams()`,
+  calls `importSession`, and reuses the same post-login redirect-to-default-tab logic as normal login (extracted
+  into a shared `useLoginSuccessRedirect` hook so `LoginWrapper` and `ImportSessionWrapper` don't duplicate it).
+
+**Then pivoted mid-build**: the owner asked to try native Google Sign-In instead, specifically via
+`@capgo/capacitor-social-login` (actively maintained fork of the archived `@codetrix-studio/capacitor-google-auth`,
+Capacitor 8-compatible, wraps Android Credential Manager) plus `CapacitorHttp` (native networking, bypasses the
+WebView's CORS restriction that blocks a plain browser `fetch` to `webportal.jiit.ac.in`) - as an **experiment to
+verify for real** whether the Credential-Manager registration wall above actually blocks it, rather than trusting
+desk research. This is additive, not a replacement - the bookmarklet flow above is still what `LoginScreen` shows
+students; the native flow is a separate, temporary test screen.
+- **Installed**: `@capgo/capacitor-social-login` (`npx pnpm@10 add ...` - plain `npm install` fails on this
+  repo's pre-existing peer-dependency conflicts, same as `npm ci`; always use pnpm here). `capacitor.config.json`
+  gained `plugins.CapacitorHttp.enabled: true` and `plugins.SocialLogin.providers` (Google only - Facebook/Apple/
+  Twitter set to `false` so their SDKs aren't bundled into the APK at all).
+- **`src/lib/jiitAuth.js`** (new, separate from `googleAuth.js` - deliberately not wired into the real login
+  flow yet): `signInWithGoogle()` calls `SocialLogin.login({ provider: 'google' })` for a native ID token, then
+  `CapacitorHttp.post(...)` to **a different endpoint than the one reverse-engineered from the bundle earlier**
+  - `https://webportal.jiit.ac.in:6013/CLXSSOAPI/token/generate-token-google-signin` (port 6013 + `CLXSSOAPI`,
+    vs. the earlier `6011` + `StudentPortalAPI/token/generatetokengooglesignin`) - given by the owner as
+  "confirmed... from inspecting JIIT's own login page and network traffic" this session. **Worth reconciling if
+  this 404s**: could be a newer SSO gateway superseding the old path, or one of the two could simply be wrong;
+  nothing in this session directly re-verified either against a live response.
+  `GoogleSignInError` classifies failures (`cancelled`/`no_account`/`rejected`/`network`/`unknown`, with the
+  `[28444]` Credential-Manager error specifically called out in its message) so the UI never shows a silent
+  failure. Logs the full raw response body rather than assuming its shape, per the owner's request, since the
+  actual field names past `googleToken` being accepted haven't been captured yet.
+- **`src/uiv2/GoogleNativeTestScreen.jsx`** (new, temporary, unstyled by design): a button that runs
+  `signInWithGoogle()` and dumps the full success/error body on-screen (no devtools on the test device). Reachable
+  at `#/google-native-test` regardless of login state (`src/App.jsx`'s always-on route list), and linked from the
+  bottom of the real `LoginScreen` as "(dev) Test native Google Sign-In." **Delete this screen and its route once
+  the native-vs-bookmarklet question is settled either way.**
+- **Verified**: `npx pnpm@10 run build`, `npx cap sync android`, and `:app:assembleDebug` all succeed
+  (`android/gradle.properties` got new provider-toggle entries from `cap sync`, expected). All 73 Vitest tests
+  still pass. `jiitAuth.js` and `GoogleNativeTestScreen.jsx` are lint-clean. Packaged as
+  `~/projects/jiit-jportal/assets/jportal-v1.9-debug.apk`.
+- **Not verified, the actual point of this experiment**: whether `SocialLogin.login()` succeeds at all on a real
+  device. The plugin's own README (read this session) explicitly documents the `[28444] Developer console is not
+  set up correctly` failure mode for exactly this situation (app not registered under the web client's Google
+  Cloud project) as the most common cause of failure - genuinely don't know if that's what happens here or not
+  until it's run on the owner's phone. **Next step: install v1.9, tap "(dev) Test native Google Sign-In," and
+  report what's on screen** - a real device result beats another round of desk research either way.
